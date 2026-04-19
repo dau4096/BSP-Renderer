@@ -62,6 +62,7 @@ void t_createFramebuffer(Vec2i_t resolution) {
 	framebuffer.valid = (framebuffer.data != NULL);
 }
 
+RGB_t* t_getFramebufferPTR(void) {return framebuffer.data;}
 
 void t_deleteFramebuffer(void) {
 	if (!framebuffer.valid) {return; /* Already deleted. */}
@@ -81,6 +82,12 @@ void t_writePX(Vec2i_t position, RGB_t colour) {
 	) {
 		return; //Out of the FB.
 	}
+
+#ifdef COLOUR_QUANTISATION
+	colour.r = (colour.r >> 4) << 4;
+	colour.g = (colour.g >> 4) << 4;
+	colour.b = (colour.b >> 4) << 4;
+#endif
 
 	framebuffer.data[(int)((position.y * framebuffer.resolution.x) + position.x)] = colour;
 }
@@ -129,7 +136,7 @@ static inline char* intAppend(char *dst, int v) {
 
 
 static inline char* setForeground(char *out, RGB_t c) {
-    out = strAppend(out, "\x1b[38;2;");
+	*out++ = '\x1b'; *out++ = '['; *out++ = '3'; *out++ = '8'; *out++ = ';'; *out++ = '2'; *out++ = ';'; //"\x1b[38;2;"
     out = intAppend(out, c.r); *out++ = ';';
     out = intAppend(out, c.g); *out++ = ';';
     out = intAppend(out, c.b); *out++ = 'm';
@@ -137,7 +144,7 @@ static inline char* setForeground(char *out, RGB_t c) {
 }
 
 static inline char* setBackground(char *out, RGB_t c) {
-    out = strAppend(out, "\x1b[48;2;");
+	*out++ = '\x1b'; *out++ = '['; *out++ = '4'; *out++ = '8'; *out++ = ';'; *out++ = '2'; *out++ = ';'; //"\x1b[48;2;"
     out = intAppend(out, c.r); *out++ = ';';
     out = intAppend(out, c.g); *out++ = ';';
     out = intAppend(out, c.b); *out++ = 'm';
@@ -174,11 +181,11 @@ void t_drawFramebuffer(void) {
 
 
             //Check if the colour needs to change.
-            if (memcmp(&top, &topPrev, sizeof(RGB_t)) != 0u) {
+            if ((top.r != topPrev.r) || (top.g != topPrev.g) || (top.b != topPrev.b)) {
 	            out = setForeground(out, top);
 			    topPrev = top;
 			}
-			if (memcmp(&low, &lowPrev, sizeof(RGB_t)) != 0u) {
+			if ((low.r != lowPrev.r) || (low.g != lowPrev.g) || (low.b != lowPrev.b)) {
 	            out = setBackground(out, low);
 			    lowPrev = low;
 			}
@@ -198,3 +205,17 @@ void t_drawFramebuffer(void) {
     free(buffer);
 }
 
+
+void t_clearFramebuffer(void) {
+	//Fills with black, slightly quicker than the loop method.
+	memset(framebuffer.data, 0x00, (framebuffer.resolution.x * framebuffer.resolution.y) * sizeof(RGB_t));
+}
+
+void t_fillFramebuffer(RGB_t colour) {
+	//Fill with single colour.
+	//Compiler (hopefully) optimises this nicer!
+	RGB_t* end = framebuffer.data + (framebuffer.resolution.x * framebuffer.resolution.y);
+	for (RGB_t* ptr=framebuffer.data; ptr<end; ptr++) {
+		*ptr = colour;
+	}
+}

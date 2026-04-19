@@ -1,5 +1,4 @@
 CC = gcc
-#Empty CFLAGS for now.
 CFLAGS = 
 INCLUDE = -I/usr/include -I/usr/local/include
 
@@ -19,7 +18,7 @@ release: CFLAGS := -O2 -ffast-math
 release: $(OBJECTS)
 	$(CC) $(OBJECTS) $(LIBS) -o $(BINFILE)
 
-debug: CFLAGS := -g -DDEBUG
+debug: CFLAGS := -g -DDEBUG -DCOLOUR_QUANTISATION
 debug: $(OBJECTS)
 	$(CC) $(OBJECTS) $(LIBS) -o $(BINFILE)
 

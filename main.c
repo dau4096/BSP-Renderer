@@ -31,6 +31,7 @@ double now(void) {
 #define UI_HEIGHT 0u
 
 
+
 int main(void) {
 	signal(SIGINT, signalHandler);
 
@@ -45,23 +46,37 @@ int main(void) {
 	unsigned int frameNumber = 0u;
 	do { //Frameloop
 		start = now();
+		Vec2i_t newTResChars = t_getTerminalSize();
+		newTResChars.y -= UI_HEIGHT + 1; //Subtract 1 more, to let the command prompt onscreen.
+		if ((newTResChars.x != tResChars.x) || (newTResChars.y != tResChars.y)) {
+			//Remake framebuffer to fit new res.
+			tResChars = newTResChars;
+			Vec2i_t tResPX = (Vec2i_t){tResChars.x, tResChars.y*2};
+			t_createFramebuffer(tResPX);
+		}
+		t_clearFramebuffer();
+
 
 		//Example frame-task.
+		int b = 0;//(int)((sin((double)(frameNumber) * 1.0e-1) + 1.0) * 128.0);
 		for (int x=0; x<tResPX.x; x++) {
+			int r = (int)((float)(x) / (float)(tResPX.x) * 255.0f);
 			for (int y=0; y<tResPX.y; y++) {
 				RGB_t colour = {
-					(int)((float)(x) / (float)(tResPX.x) * 255.0f),
-					(int)((float)(y) / (float)(tResPX.y) * 255.0f),
-					(int)((sin((double)(frameNumber) * 1.0e-1) + 1.0) * 128.0)
+					r, (int)((float)(y) / (float)(tResPX.y) * 255.0f), b
 				};
 				t_writePX((Vec2i_t){x,y}, colour);
 			}
 		}
 
+
 		t_resetCursor();
 		t_drawFramebuffer();
 
+
+
 		double elapsed = now() - start;
+		printf("Frame %d took: %.1lfms Theoretical FPS: %.1lf", frameNumber, elapsed*1000.0, 1.0 / elapsed); //Display real DT.
 		double remaining = DT - elapsed;
 		if (remaining > 0) {
 			struct timespec ts;
@@ -71,6 +86,7 @@ int main(void) {
 		}
 		frameNumber++;
 	} while (run);
+	printf("\n");
 
 	t_deleteFramebuffer();
 
