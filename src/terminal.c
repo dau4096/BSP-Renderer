@@ -6,12 +6,47 @@
 #include <string.h>
 #include <stdio.h>
 
+
 #include "types.h"
 
 
 
 Buffer_t framebuffer;
 
+
+
+
+#ifndef _WIN32
+//Linux only method.
+#include <sys/ioctl.h>
+#include <unistd.h>
+Vec2i_t t_getTerminalSize() {
+	//Gets size of the terminal window, in characters.
+	struct winsize w;
+
+	ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+
+	return (Vec2i_t){
+		.x = w.ws_col,
+		.y = w.ws_row,
+	};
+}
+
+#else
+//Windows only method.
+#include <windows.h>
+
+Vec2i_t t_getTerminalSize() {
+	CONSOLE_SCREEN_BUFFER_INFO csbi;
+	GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
+
+	return (Vec2i_t){
+		.x = csbi.srWindow.Right - csbi.srWindow.Left + 1,
+		.y = csbi.srWindow.Bottom - csbi.srWindow.Top - 1
+	};
+}
+
+#endif
 
 
 void t_createFramebuffer(Vec2i_t resolution) {
