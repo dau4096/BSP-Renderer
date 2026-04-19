@@ -7,9 +7,10 @@
 
 #include "src/types.h"
 #include "src/terminal.h"
+#include "src/io.h"
 
 
-int run = 1;
+volatile sig_atomic_t run = 1;
 void signalHandler(int sig) {
 	//^C interrupt caught. Temporary fix for no IO.
 	run = 0;
@@ -40,6 +41,7 @@ int main(void) {
 	Vec2i_t tResPX = (Vec2i_t){tResChars.x, tResChars.y*2};
 
 	t_createFramebuffer(tResPX);
+	io_init();
 
 
 	double start;
@@ -55,6 +57,7 @@ int main(void) {
 			t_createFramebuffer(tResPX);
 		}
 		t_clearFramebuffer();
+		io_pollEvents();
 
 
 		//Example frame-task.
@@ -72,6 +75,7 @@ int main(void) {
 
 		t_resetCursor();
 		t_drawFramebuffer();
+		fflush(stdout);
 
 
 
@@ -85,10 +89,11 @@ int main(void) {
 			nanosleep(&ts, NULL);
 		}
 		frameNumber++;
-	} while (run);
+	} while (run && !(keyMap[K_QUIT]));
 	printf("\n");
 
 	t_deleteFramebuffer();
+	io_quit();
 
 	return 1;
 }
