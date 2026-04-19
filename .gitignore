@@ -1,0 +1,9 @@
+#Compiled programs;
+*.exe
+*.x86_64
+
+#Object files and libs
+*.o
+*.so
+*.dll
+
