@@ -15,7 +15,6 @@ Buffer_t framebuffer;
 
 
 
-
 #ifndef _WIN32
 //Linux only method.
 #include <sys/ioctl.h>
@@ -36,7 +35,7 @@ Vec2i_t t_getTerminalSize() {
 //Windows only method.
 #include <windows.h>
 
-Vec2i_t t_getTerminalSize() {
+Vec2i_t t_getTerminalSize(void) {
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
 	GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
 
@@ -64,7 +63,7 @@ void t_createFramebuffer(Vec2i_t resolution) {
 }
 
 
-void t_deleteFramebuffer() {
+void t_deleteFramebuffer(void) {
 	if (!framebuffer.valid) {return; /* Already deleted. */}
 	free(framebuffer.data);
 	framebuffer.resolution = (Vec2i_t){0, 0};
@@ -146,9 +145,15 @@ static inline char* setBackground(char *out, RGB_t c) {
 }
 
 
+
+void t_resetCursor(void) {
+	printf("\x1b[1;1H"); //Moves cursor to the top-left.
+}
+
+
 #define WIDTH  (framebuffer.resolution.x)
 #define HEIGHT (framebuffer.resolution.y)
-void t_drawFramebuffer() {
+void t_drawFramebuffer(void) {
     if (!framebuffer.valid) {return; /* Invalid, Can't show. */}
 
     size_t bufferSize = (size_t)(WIDTH * (HEIGHT/2 + 1) * 64);
@@ -192,3 +197,4 @@ void t_drawFramebuffer() {
     fwrite(buffer, 1, out - buffer, stdout);
     free(buffer);
 }
+
