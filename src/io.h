@@ -19,6 +19,7 @@ void io_quit(void);
 
 
 void io_pollEvents(void);
+void io_handleInputs(Camera_t* camera);
 
 
 

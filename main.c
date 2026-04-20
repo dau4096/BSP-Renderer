@@ -8,6 +8,9 @@
 #include "src/types.h"
 #include "src/terminal.h"
 #include "src/io.h"
+#include "src/graphics.h"
+
+
 
 
 volatile sig_atomic_t run = 1;
@@ -42,6 +45,8 @@ int main(void) {
 
 	t_createFramebuffer(tResPX);
 	io_init();
+	r_initCamera();
+	r_createGeometry();
 
 
 	double start;
@@ -60,18 +65,10 @@ int main(void) {
 		io_pollEvents();
 
 
-		//Example frame-task.
-		int b = 0;//(int)((sin((double)(frameNumber) * 1.0e-1) + 1.0) * 128.0);
-		for (int x=0; x<tResPX.x; x++) {
-			int r = (int)((float)(x) / (float)(tResPX.x) * 255.0f);
-			for (int y=0; y<tResPX.y; y++) {
-				RGB_t colour = {
-					r, (int)((float)(y) / (float)(tResPX.y) * 255.0f), b
-				};
-				t_writePX((Vec2i_t){x,y}, colour);
-			}
-		}
-
+		//Tasks for this frame;
+		io_handleInputs(&camera);
+		r_drawFrame(tResPX);
+		
 
 		t_resetCursor();
 		t_drawFramebuffer();

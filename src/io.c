@@ -1,8 +1,10 @@
 /* io.c */
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include "types.h"
+#include "maths.h"
 #include "io.h"
 
 
@@ -25,7 +27,7 @@ static struct termios oldTermios;
 
 void io_init(void) {
 	
-	fd = open("/dev/input/event9", O_RDONLY | O_NONBLOCK);
+	fd = open("/dev/input/event12", O_RDONLY | O_NONBLOCK);
 	if (fd < 0) {
 		perror("open");
 		exit(1);
@@ -128,7 +130,7 @@ void io_init(void) {/* Nothing to do. */}
 void io_quit(void) {/* Nothing to do. */}
 
 void io_pollEvents(void) {
-	for (int vk = 0; vk < 256; vk++) {
+	for (int vk=0; vk<256; vk++) {
 		int ID = getID(vk);
 		if (ID >= NUM_KEYS) {continue;}
 
@@ -141,3 +143,30 @@ void io_pollEvents(void) {
 
 
 #endif
+
+
+
+
+#define MOVEMENT_SPEED 2.0f/60.0f /* In units/tick */
+#define TURNING_SPEED 3.14f/60.0f /* In radians/tick */
+#define PI2 6.283185f  /* 2*pi to 6d.p. */
+void io_handleInputs(Camera_t* camera) {
+	//Move camera based on inputs.
+	Vec2f_t forward = v2f_mul((Vec2f_t){
+		.x=sin(camera->yaw), .y=cos(camera->yaw)
+	}, MOVEMENT_SPEED);
+	Vec2f_t right = (Vec2f_t){.x=forward.y, .y=-forward.x};
+
+	if (keyMap[K_MOVE_FORE]) {camera->position = v2f_add(camera->position, forward);}
+	if (keyMap[K_MOVE_BACK]) {camera->position = v2f_sub(camera->position, forward);}
+	if (keyMap[K_MOVE_LEFT]) {camera->position = v2f_sub(camera->position, right);}
+	if (keyMap[K_MOVE_RIGHT]) {camera->position = v2f_add(camera->position, right);}
+
+
+	//Camera Controls
+	if (keyMap[K_TURN_LEFT]) {camera->yaw -= TURNING_SPEED;}
+	if (keyMap[K_TURN_RIGHT]) {camera->yaw += TURNING_SPEED;}
+	camera->yaw = fmod(camera->yaw + PI2, PI2);
+
+	printf("(%f, %f) [%f]\n", camera->position.x, camera->position.y, camera->yaw);
+}

@@ -48,7 +48,7 @@ Vec2i_t t_getTerminalSize(void) {
 #endif
 
 
-void t_createFramebuffer(Vec2i_t resolution) {
+void t_createFramebuffer(const Vec2i_t resolution) {
 	//Overwrites the current instance of framebuffer (if valid) with a new FB.
 	if ((resolution.x <= 0.0f) || (resolution.y <= 0.0f)) {return; /* Invalid resize */}
 
@@ -73,7 +73,7 @@ void t_deleteFramebuffer(void) {
 
 
 
-void t_writePX(Vec2i_t position, RGB_t colour) {
+void t_writePX(const Vec2i_t position, RGB_t colour) {
 	if (!framebuffer.valid) {return;}
 	if (
 		(position.x < 0.0f) || (position.y < 0.0f) ||
@@ -93,7 +93,7 @@ void t_writePX(Vec2i_t position, RGB_t colour) {
 }
 
 
-RGB_t t_readPX(Vec2i_t position) {
+RGB_t t_readPX(const Vec2i_t position) {
 	if (!framebuffer.valid) {return (RGB_t){0u, 0u, 0u};}
 	if (
 		(position.x < 0.0f) || (position.y < 0.0f) ||
@@ -135,7 +135,7 @@ static inline char* intAppend(char *dst, int v) {
 }
 
 
-static inline char* setForeground(char *out, RGB_t c) {
+static inline char* setForeground(char *out, const RGB_t c) {
 	*out++ = '\x1b'; *out++ = '['; *out++ = '3'; *out++ = '8'; *out++ = ';'; *out++ = '2'; *out++ = ';'; //"\x1b[38;2;"
     out = intAppend(out, c.r); *out++ = ';';
     out = intAppend(out, c.g); *out++ = ';';
@@ -143,7 +143,7 @@ static inline char* setForeground(char *out, RGB_t c) {
     return out;
 }
 
-static inline char* setBackground(char *out, RGB_t c) {
+static inline char* setBackground(char *out, const RGB_t c) {
 	*out++ = '\x1b'; *out++ = '['; *out++ = '4'; *out++ = '8'; *out++ = ';'; *out++ = '2'; *out++ = ';'; //"\x1b[48;2;"
     out = intAppend(out, c.r); *out++ = ';';
     out = intAppend(out, c.g); *out++ = ';';

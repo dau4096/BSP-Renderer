@@ -28,6 +28,7 @@ typedef struct {uint8_t r, g, b;} RGB_t;
 typedef struct {
 	int x, y;
 } Vec2i_t;
+
 typedef struct {
 	float x, y;
 } Vec2f_t;
@@ -40,6 +41,27 @@ typedef struct {
 	Vec2i_t resolution;
 } Buffer_t;
 
+typedef struct {
+	unsigned int vStart; //Start vertex ID
+	unsigned int vEnd;  //End vertex ID
+	int frontSector;   //Sector ID this LineDef_t belongs to
+	int backSector;   //-1 if solid wall, else index of neighbouring sector.
+	RGB_t colour;    //Colour to draw.
+} LineDef_t;
+
+typedef struct {
+	float floorHeight;
+	float ceilingHeight;
+	unsigned int* lineDefs;    //Array of IDs to LineDef_t[] array (Like 3D model indices)
+	unsigned int numLineDefs; //Length of ID array [^^].
+} Sector_t;
+
+typedef struct {
+	Vec2f_t position;
+	float yaw; //Yaw in radians
+	float FOV; //FOV in radians
+	float maxDistance; //Maximum view distance
+} Camera_t;
 
 
 #endif
