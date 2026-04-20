@@ -73,9 +73,8 @@ int r_getCentreX(const Vec2f_t position, const Vec2i_t resolution) {
 
 
 void r_getLineDefSectorProjections(
-	const int sectorID, float invDistance, int* lowYBound, int* topYBound, const Vec2i_t resolution
+	const Sector_t* thisSector, float invDistance, int* lowYBound, int* topYBound, const Vec2i_t resolution
 ) {
-	const Sector_t* thisSector = sectors + sectorID;
 	float projectedYFloor = (cameraZ - thisSector->floorHeight) * invDistance;
 	float projectedYCeiling = (cameraZ - thisSector->ceilingHeight) * invDistance;
 
@@ -84,33 +83,55 @@ void r_getLineDefSectorProjections(
 }
 
 
-static int tmp = FALSE;
-void r_drawColumn(const int sectorID, int x, float invDistance, RGB_t* fbPTR, const Vec2i_t resolution, RGB_t colour) {
+void r_drawColumn(
+	const int sectorID,
+	int x, float invDistance,
+	RGB_t* fbPTR, const Vec2i_t resolution, RGB_t colour,
+	const int minYBound, const int maxYBound //Range allowed to draw in.
+) {
 	//Draw this wall collumn.
 	int lowYBound, topYBound;
+	const Sector_t* thisSector = sectors + sectorID;
 	r_getLineDefSectorProjections(
-		sectorID, invDistance, &lowYBound, &topYBound, resolution
+		thisSector, invDistance, &lowYBound, &topYBound, resolution
 	);
-	if ((topYBound<0) || (lowYBound>=resolution.y)) {return; /* Completely offscreen vertically. */}
+	if ((topYBound<minYBound) || (lowYBound>=maxYBound)) {return; /* Completely offscreen vertically. */}
 
-	//printf("Found LowBound: %d, HighBound: %d\n", lowYBound, topYBound);
-	int yLow = fmax(lowYBound, 0);
-	int yTop = fmin(topYBound, resolution.y-1);
-	//printf("Found Low: %d, High: %d\n", yLow, yTop);
+	int yLow = fmax(lowYBound, minYBound);
+	int yTop = fmin(topYBound, maxYBound);
 
+	//Draws top-to-bottom vertically.
+	RGB_t* ptr;
 
-	//Draw.
-	RGB_t* ptr = fbPTR + x + (resolution.x * yLow);
+	//Draw ceiling.
+	ptr = fbPTR + x + (resolution.x * minYBound);
+	for (int y=minYBound; y<yLow; y++) {
+		*ptr = thisSector->ceilingColour;
+		ptr += resolution.x;	
+	}
+
+	//Draw wall.
+	ptr = fbPTR + x + (resolution.x * yLow);
 	for (int y=yLow; y<yTop; y++) {
 		//Texturing TBA. yLow is low INDEX not low ONSCREEN.
 		*ptr = colour; //Magenta for now.
 		ptr += resolution.x;
 	}
+
+	//Draw floor.
+	ptr = fbPTR + x + (resolution.x * yTop);
+	for (int y=yTop; y<maxYBound; y++) {
+		*ptr = thisSector->floorColour;
+		ptr += resolution.x;	
+	}
 }
 
 
 
-void r_drawLineDef(const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t* fbPTR) {
+void r_drawLineDef(
+	const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t* fbPTR,
+	const int minYBound, const int maxYBound //Range allowed to draw in.
+) {
 	//Interpolate from start-end along the LineDef.
 	Vec2f_t start = vertices[thisLineDef->vStart];
 	Vec2f_t end = vertices[thisLineDef->vEnd];
@@ -121,7 +142,7 @@ void r_drawLineDef(const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t
 
 	if ((dStart < 0.0f) && (dEnd < 0.0f)) return;
 
-	// If one point is behind, clip it
+	//If one point is behind, clip it.
 	if ((dStart < 0.0f) || (dEnd < 0.0f)) {
 	    float t = dStart / (dStart - dEnd);
 
@@ -179,17 +200,28 @@ void r_drawLineDef(const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t
 			.b=thisLineDef->colour.b*t
 		};
 		t_quantise(&colour);
-		r_drawColumn(thisLineDef->frontSector, x, aspectRatio * invDistance, fbPTR, resolution, colour);
+		r_drawColumn(
+			thisLineDef->frontSector,
+			x, aspectRatio * invDistance,
+			fbPTR, resolution, colour,
+			minYBound, maxYBound
+		);
 	}
 }
 
 
-void r_drawSector(const Sector_t* thisSector, const Vec2i_t resolution, RGB_t* fbPTR) {
+void r_drawSector(
+	const Sector_t* thisSector, const Vec2i_t resolution, RGB_t* fbPTR,
+	const int minYBound, const int maxYBound //Range allowed to draw in.
+) {
 	//Loop through it's linedefs, drawing those.
 	for (unsigned int secLD=0u; secLD<thisSector->numLineDefs; secLD++) {
 		unsigned int ldIndex = thisSector->lineDefs[secLD];
 		const LineDef_t* thisLineDef = lineDefs + ldIndex;
-		r_drawLineDef(thisLineDef, resolution, fbPTR);
+		r_drawLineDef(
+			thisLineDef, resolution, fbPTR,
+			minYBound, maxYBound
+		);
 	}
 }
 
@@ -200,13 +232,14 @@ void r_drawFrame(const Vec2i_t resolution) {
 	RGB_t* fbPTR = t_getFramebufferPTR();
 	r_clearDepth(resolution.x); //Reset depth data for this frame.
 
-	tmp = FALSE;
 	for (unsigned int sIndex=0u; sIndex<MAX_SECTORS; sIndex++) {
 		Sector_t* thisSector = sectors + sIndex;
 		if (thisSector->numLineDefs) {
 			//Nonzero number of lines.
-			r_drawSector(thisSector, resolution, fbPTR);
-			tmp = TRUE;
+			r_drawSector(
+				thisSector, resolution, fbPTR,
+				0, resolution.y-1
+			);
 		}
 	}
 }
@@ -275,7 +308,8 @@ void r_createGeometry(void) {
 	ldIndices[3] = 3;
 	ldIndices[4] = 4;
 	sectors[0] = (Sector_t){
-		.floorHeight=-2.0f, .ceilingHeight=2.0f,
+		.floorHeight=-2.0f, .floorColour=RGB_GREY,
+		.ceilingHeight=2.0f, .ceilingColour=RGB_WHITE,
 		.lineDefs=ldIndices, .numLineDefs=5
 	};
 }

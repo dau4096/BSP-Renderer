@@ -171,8 +171,10 @@ void t_drawFramebuffer(void) {
     char *buffer = malloc(bufferSize); //Start
     char *out = buffer; //End
 
+    out = strAppend(out, "\x1b[0m"); //Definitely reset.
     RGB_t topPrev = RGB_WHITE;
 	RGB_t lowPrev = RGB_BLACK;
+	int hasReset = TRUE; ///May not be accurate, force a colour change.
 
     for (uint y=0u; y<HEIGHT; y+=2u) {
         for (uint x=0u; x<WIDTH; x++) {
@@ -185,13 +187,15 @@ void t_drawFramebuffer(void) {
 
 
             //Check if the colour needs to change.
-            if ((top.r != topPrev.r) || (top.g != topPrev.g) || (top.b != topPrev.b)) {
+            if (hasReset || (top.r != topPrev.r) || (top.g != topPrev.g) || (top.b != topPrev.b)) {
 	            out = setForeground(out, top);
 			    topPrev = top;
+			    hasReset = FALSE; //Has not reset, free to assume continuous colour.
 			}
-			if ((low.r != lowPrev.r) || (low.g != lowPrev.g) || (low.b != lowPrev.b)) {
+			if (hasReset || (low.r != lowPrev.r) || (low.g != lowPrev.g) || (low.b != lowPrev.b)) {
 	            out = setBackground(out, low);
 			    lowPrev = low;
+			    hasReset = FALSE; //Has not reset, free to assume continuous colour.
 			}
 
 
@@ -203,6 +207,7 @@ void t_drawFramebuffer(void) {
         out = strAppend(out, "\x1b[0m\n"); //Reset formatting.
     	topPrev = RGB_WHITE;
 		lowPrev = RGB_BLACK;
+		hasReset = TRUE;
     }
 
     fwrite(buffer, 1, out - buffer, stdout);
