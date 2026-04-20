@@ -2,12 +2,15 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "types.h"
 #include "maths.h"
 #include "terminal.h"
 
 
+
+//////// DATA ////////
 //Temporary, while camera is in 2D.
 #define cameraZ 0.0f
 Camera_t camera; //The view
@@ -21,18 +24,48 @@ Camera_t camera; //The view
 Vec2f_t vertices[MAX_VERTICES]; //2D positions.
 LineDef_t lineDefs[MAX_LINEDEFS]; //LineDefs connecting vertices.
 Sector_t sectors[MAX_SECTORS]; //Sectors made of LineDefs.
+//////// DATA ////////
 
 
 
 
+//////// DEPTH MAPPING ////////
+typedef uint8_t Depth_t;
+Depth_t* depthMap; //1D depthmap.
+
+void r_reallocDepthMap(const int width) {
+	if (depthMap) {
+		free(depthMap);
+	}
+	depthMap = calloc(width, sizeof(Depth_t));
+}
+
+
+void r_clearDepth(const int width) {
+	memset(depthMap, (Depth_t)(0xFFu), width * sizeof(Depth_t)); //Reset to all 0xFF (255, max depth) values.
+}
+
+
+Depth_t r_mapDepth(float depthF) {
+	return (Depth_t)(
+		fmin(depthF / camera.maxDistance, 1.0f) * 255.0f //Remap to 0-255.
+	);
+}
+//////// DEPTH MAPPING ////////
+
+
+
+
+
+//////// DRAWING ////////
 int r_getCentreX(const Vec2f_t position, const Vec2i_t resolution) {
 	Vec2f_t direction = v2f_sub(position, camera.position);
 
 	float theta = atan2(direction.x, direction.y);
 	float angleDelta = theta - camera.yaw;
 
-	if (angleDelta >  180.0f) {angleDelta -= 360.0f;}
-	if (angleDelta < -180.0f) {angleDelta += 360.0f;}
+	while (angleDelta >  M_PI) angleDelta -= 2.0f * M_PI;
+	while (angleDelta < -M_PI) angleDelta += 2.0f * M_PI;
 
 	float centreX = ((float)(resolution.x) / 2.0f) * ((angleDelta * 2.0f / camera.FOV) + 1.0f);
 	return (int)(centreX);
@@ -85,7 +118,9 @@ void r_drawLineDef(const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t
 	//Project into screen horizontally
 	int startX = r_getCentreX(start, resolution);
 	int endX = r_getCentreX(end, resolution);
-	//printf("Start: %d, End: %d\n", startX, endX);
+#ifdef SUPRESS_FRAMEBUFFER_OUTPUT
+	printf("Start: %d, End: %d\n", startX, endX);
+#endif
 	if (startX == endX) {return; /* Infinitely thin, don't draw. */}
 
 	//Calculate depth
@@ -110,11 +145,16 @@ void r_drawLineDef(const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t
 
 	//Draw, interpolating.
 	float aspectRatio = (float)(resolution.x) / (float)(resolution.y);
-	printf("L: %d, R: %d\n", leftMost, rightMost);
+	//printf("L: %d, R: %d\n", leftMost, rightMost);
 	for (int x=leftMost; x<rightMost; x++) {
 		float t = (float)(x - leftMost) / (float)(range);
-		float invDistance = aspectRatio * f_lerp(lInvDepth, rInvDepth, t);
-		r_drawColumn(thisLineDef->frontSector, x, invDistance, fbPTR, resolution, thisLineDef->colour);
+		float invDistance = f_lerp(lInvDepth, rInvDepth, t);
+
+		Depth_t mappedDepth = r_mapDepth(1.0f / invDistance);
+		if (depthMap[x] <= mappedDepth) {continue; /* Occluded */}
+		depthMap[x] = mappedDepth;
+
+		r_drawColumn(thisLineDef->frontSector, x, aspectRatio * invDistance, fbPTR, resolution, thisLineDef->colour);
 	}
 }
 
@@ -133,6 +173,7 @@ void r_drawSector(const Sector_t* thisSector, const Vec2i_t resolution, RGB_t* f
 void r_drawFrame(const Vec2i_t resolution) {
 	//TBA
 	RGB_t* fbPTR = t_getFramebufferPTR();
+	r_clearDepth(resolution.x); //Reset depth data for this frame.
 
 	tmp = FALSE;
 	for (unsigned int sIndex=0u; sIndex<MAX_SECTORS; sIndex++) {
@@ -144,9 +185,11 @@ void r_drawFrame(const Vec2i_t resolution) {
 		}
 	}
 }
+//////// DRAWING ////////
 
 
 
+//////// INITIALISATION ////////
 void r_initCamera(void) {
 	camera = (Camera_t){
 		.position=(Vec2f_t){.x=0.0f, .y=0.0f},
@@ -192,3 +235,6 @@ void r_createGeometry(void) {
 		.lineDefs=ldIndices, .numLineDefs=3
 	};
 }
+//////// INITIALISATION ////////
+
+

@@ -208,7 +208,7 @@ void t_drawFramebuffer(void) {
 
 void t_clearFramebuffer(void) {
 	//Fills with black, slightly quicker than the loop method.
-	memset(framebuffer.data, 0x00, (framebuffer.resolution.x * framebuffer.resolution.y) * sizeof(RGB_t));
+	memset(framebuffer.data, 0x00u, (framebuffer.resolution.x * framebuffer.resolution.y) * sizeof(RGB_t));
 }
 
 void t_fillFramebuffer(RGB_t colour) {

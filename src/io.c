@@ -149,7 +149,6 @@ void io_pollEvents(void) {
 
 #define MOVEMENT_SPEED 2.0f/60.0f /* In units/tick */
 #define TURNING_SPEED 3.14f/60.0f /* In radians/tick */
-#define PI2 6.283185f  /* 2*pi to 6d.p. */
 void io_handleInputs(Camera_t* camera) {
 	//Move camera based on inputs.
 	Vec2f_t forward = v2f_mul((Vec2f_t){
@@ -166,7 +165,10 @@ void io_handleInputs(Camera_t* camera) {
 	//Camera Controls
 	if (keyMap[K_TURN_LEFT]) {camera->yaw -= TURNING_SPEED;}
 	if (keyMap[K_TURN_RIGHT]) {camera->yaw += TURNING_SPEED;}
-	camera->yaw = fmod(camera->yaw + PI2, PI2);
+	camera->yaw = fmod(camera->yaw, 2.0f * M_PI);
+	if (camera->yaw < 0) {camera->yaw += 2.0f * M_PI;}
 
+#ifdef SUPRESS_FRAMEBUFFER_OUTPUT
 	printf("(%f, %f) [%f]\n", camera->position.x, camera->position.y, camera->yaw);
+#endif
 }

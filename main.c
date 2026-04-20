@@ -43,7 +43,9 @@ int main(void) {
 	tResChars.y -= UI_HEIGHT + 1; //Subtract 1 more, to let the command prompt onscreen.
 	Vec2i_t tResPX = (Vec2i_t){tResChars.x, tResChars.y*2};
 
-	t_createFramebuffer(tResPX);
+	t_createFramebuffer(tResPX); //Create framebuffer. (2D pixel data)
+	r_reallocDepthMap(tResPX.x); //Create depthmap. (1D depth data)
+
 	io_init();
 	r_initCamera();
 	r_createGeometry();
@@ -59,9 +61,14 @@ int main(void) {
 			//Remake framebuffer to fit new res.
 			tResChars = newTResChars;
 			Vec2i_t tResPX = (Vec2i_t){tResChars.x, tResChars.y*2};
-			t_createFramebuffer(tResPX);
+			t_createFramebuffer(tResPX); //Remake framebuffer to the correct resolution.
+			r_reallocDepthMap(tResPX.x); //Reallocate depthmap to the correct width.
+
+		} else {
+			//No need to clear framebuffer if it was reallocated, calloc automatically clears it to black.
+			t_clearFramebuffer();
 		}
-		t_clearFramebuffer();
+
 		io_pollEvents();
 
 
@@ -69,9 +76,10 @@ int main(void) {
 		io_handleInputs(&camera);
 		r_drawFrame(tResPX);
 		
-
+	#ifndef SUPRESS_FRAMEBUFFER_OUTPUT
 		t_resetCursor();
 		t_drawFramebuffer();
+	#endif
 		fflush(stdout);
 
 
