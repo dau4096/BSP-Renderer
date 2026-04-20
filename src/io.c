@@ -15,7 +15,6 @@ int keyMap[NUM_KEYS];
 #ifndef _WIN32 //Linux only;
 
 #include <linux/input.h>
-#include <linux/input-event-codes.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -183,25 +182,27 @@ void io_pollEvents(void) {
 #define MOVEMENT_SPEED_BASE 2.0f/60.0f /* In units/tick */
 #define TURNING_SPEED 2.75f/60.0f /* In radians/tick */
 void io_handleInputs(Camera_t* camera) {
+	//Camera Controls
+	if (keyMap[K_TURN_LEFT]) {camera->yaw -= TURNING_SPEED;}
+	if (keyMap[K_TURN_RIGHT]) {camera->yaw += TURNING_SPEED;}
+	camera->yaw = fmod(camera->yaw, 2.0f * M_PI);
+	if (camera->yaw < 0) {camera->yaw += 2.0f * M_PI;}
+
+	camera->forward = (Vec2f_t){
+		.x=sin(camera->yaw), .y=cos(camera->yaw)
+	};
+
+
 	//Move camera based on inputs.
 	float movementSpeed = MOVEMENT_SPEED_BASE;
 	if (keyMap[K_MOVE_FAST]) {movementSpeed *= 2.5f;}
-	Vec2f_t forward = v2f_mul((Vec2f_t){
-		.x=sin(camera->yaw), .y=cos(camera->yaw)
-	}, movementSpeed);
+	Vec2f_t forward = v2f_mul(camera->forward, movementSpeed);
 	Vec2f_t right = (Vec2f_t){.x=forward.y, .y=-forward.x};
 
 	if (keyMap[K_MOVE_FORE]) {camera->position = v2f_add(camera->position, forward);}
 	if (keyMap[K_MOVE_BACK]) {camera->position = v2f_sub(camera->position, forward);}
 	if (keyMap[K_MOVE_LEFT]) {camera->position = v2f_sub(camera->position, right);}
 	if (keyMap[K_MOVE_RIGHT]) {camera->position = v2f_add(camera->position, right);}
-
-
-	//Camera Controls
-	if (keyMap[K_TURN_LEFT]) {camera->yaw -= TURNING_SPEED;}
-	if (keyMap[K_TURN_RIGHT]) {camera->yaw += TURNING_SPEED;}
-	camera->yaw = fmod(camera->yaw, 2.0f * M_PI);
-	if (camera->yaw < 0) {camera->yaw += 2.0f * M_PI;}
 
 #ifdef SUPRESS_FRAMEBUFFER_OUTPUT
 	printf("(%f, %f) [%f]\n", camera->position.x, camera->position.y, camera->yaw);

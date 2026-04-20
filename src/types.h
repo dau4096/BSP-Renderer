@@ -58,6 +58,7 @@ typedef struct {
 
 typedef struct {
 	Vec2f_t position;
+	Vec2f_t forward;
 	float yaw; //Yaw in radians
 	float FOV; //FOV in radians
 	float maxDistance; //Maximum view distance

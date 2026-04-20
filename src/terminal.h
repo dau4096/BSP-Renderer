@@ -15,6 +15,7 @@ void t_createFramebuffer(const Vec2i_t resolution);
 RGB_t* t_getFramebufferPTR(void);
 void t_deleteFramebuffer(void);
 
+void t_quantise(RGB_t* colour);
 void t_writePX(const Vec2i_t position, RGB_t colour);
 RGB_t t_readPX(const Vec2i_t position);
 

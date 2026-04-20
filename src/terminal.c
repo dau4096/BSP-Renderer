@@ -72,6 +72,14 @@ void t_deleteFramebuffer(void) {
 }
 
 
+void t_quantise(RGB_t* colour) {
+#ifdef COLOUR_QUANTISATION //Only modifies if necessary.
+	colour->r = (colour->r >> 4) << 4;
+	colour->g = (colour->g >> 4) << 4;
+	colour->b = (colour->b >> 4) << 4;
+#endif
+}
+
 
 void t_writePX(const Vec2i_t position, RGB_t colour) {
 	if (!framebuffer.valid) {return;}
@@ -83,11 +91,7 @@ void t_writePX(const Vec2i_t position, RGB_t colour) {
 		return; //Out of the FB.
 	}
 
-#ifdef COLOUR_QUANTISATION
-	colour.r = (colour.r >> 4) << 4;
-	colour.g = (colour.g >> 4) << 4;
-	colour.b = (colour.b >> 4) << 4;
-#endif
+	t_quantise(&colour);
 
 	framebuffer.data[(int)((position.y * framebuffer.resolution.x) + position.x)] = colour;
 }

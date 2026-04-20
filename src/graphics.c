@@ -115,6 +115,24 @@ void r_drawLineDef(const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t
 	Vec2f_t start = vertices[thisLineDef->vStart];
 	Vec2f_t end = vertices[thisLineDef->vEnd];
 
+
+	float dStart = v2f_dot(camera.forward, v2f_sub(start, camera.position));
+	float dEnd = v2f_dot(camera.forward, v2f_sub(end, camera.position));
+
+	if ((dStart < 0.0f) && (dEnd < 0.0f)) return;
+
+	// If one point is behind, clip it
+	if ((dStart < 0.0f) || (dEnd < 0.0f)) {
+	    float t = dStart / (dStart - dEnd);
+
+	    Vec2f_t dir = v2f_sub(end, start);
+	    Vec2f_t clipPoint = v2f_add(start, v2f_mul(dir, t));
+
+	    if (dStart < 0.0f) {start = clipPoint;}
+	    else {end = clipPoint;}
+	}
+
+
 	//Project into screen horizontally
 	int startX = r_getCentreX(start, resolution);
 	int endX = r_getCentreX(end, resolution);
@@ -139,14 +157,15 @@ void r_drawLineDef(const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t
 	}
 	int range = rightMost - leftMost;
 
-	leftMost = fmax(leftMost, 0);
-	rightMost = fmin(rightMost, resolution.x);
+	int leftMostClamp = fmax(leftMost, 0);
+	int rightMostClamp = fmin(rightMost, resolution.x);
+	if ((rightMostClamp < 0) || (leftMostClamp >= resolution.x)) {return; /* Offscreen horizontally */}
 
 
 	//Draw, interpolating.
 	float aspectRatio = (float)(resolution.x) / (float)(resolution.y);
 	//printf("L: %d, R: %d\n", leftMost, rightMost);
-	for (int x=leftMost; x<rightMost; x++) {
+	for (int x=leftMostClamp; x<rightMostClamp; x++) {
 		float t = (float)(x - leftMost) / (float)(range);
 		float invDistance = f_lerp(lInvDepth, rInvDepth, t);
 
@@ -154,7 +173,13 @@ void r_drawLineDef(const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t
 		if (depthMap[x] <= mappedDepth) {continue; /* Occluded */}
 		depthMap[x] = mappedDepth;
 
-		r_drawColumn(thisLineDef->frontSector, x, aspectRatio * invDistance, fbPTR, resolution, thisLineDef->colour);
+		RGB_t colour = (RGB_t) {
+			.r=thisLineDef->colour.r*t,
+			.g=thisLineDef->colour.g*t,
+			.b=thisLineDef->colour.b*t
+		};
+		t_quantise(&colour);
+		r_drawColumn(thisLineDef->frontSector, x, aspectRatio * invDistance, fbPTR, resolution, colour);
 	}
 }
 
@@ -194,17 +219,21 @@ void r_initCamera(void) {
 	camera = (Camera_t){
 		.position=(Vec2f_t){.x=0.0f, .y=0.0f},
 		.yaw=0.0f, .FOV=1.22173f, //70 degrees in radians
-		.maxDistance=16.0f
+		.maxDistance=32.0f,
+		.forward=(Vec2f_t){.x=0.0f, .y=1.0f}
 	};
 }
 
 
 
 void r_createGeometry(void) {
-	vertices[0] = (Vec2f_t){.x=-1.0f, .y=1.0f};
-	vertices[1] = (Vec2f_t){.x=1.0f, .y=1.0f};
-	vertices[2] = (Vec2f_t){.x=2.0f, .y=3.0f};
-	vertices[3] = (Vec2f_t){.x=4.0f, .y=3.0f};
+	vertices[0] = (Vec2f_t){.x=-10.0f, .y=10.0f};
+	vertices[1] = (Vec2f_t){.x=10.0f, .y=10.0f};
+	vertices[2] = (Vec2f_t){.x=15.0f, .y=-10.0f};
+	vertices[3] = (Vec2f_t){.x=-17.5f, .y=-10.0f};
+	vertices[4] = (Vec2f_t){.x=-20.0f, .y=00.0f};
+
+
 
 	lineDefs[0] = (LineDef_t){
 		.vStart=0, .vEnd=1,
@@ -224,15 +253,30 @@ void r_createGeometry(void) {
 		.colour=RGB_BLUE
 	};
 
+	lineDefs[3] = (LineDef_t){
+		.vStart=3, .vEnd=4,
+		.frontSector=0, .backSector=-1,
+		.colour=RGB_YELLOW
+	};
+
+	lineDefs[4] = (LineDef_t){
+		.vStart=4, .vEnd=0,
+		.frontSector=0, .backSector=-1,
+		.colour=RGB_CYAN
+	};
+
+
 
 	unsigned int* ldIndices;
-	ldIndices = calloc(3, sizeof(unsigned int));
+	ldIndices = calloc(5, sizeof(unsigned int));
 	ldIndices[0] = 0;
 	ldIndices[1] = 1;
 	ldIndices[2] = 2;
+	ldIndices[3] = 3;
+	ldIndices[4] = 4;
 	sectors[0] = (Sector_t){
-		.floorHeight=-1.0f, .ceilingHeight=1.0f,
-		.lineDefs=ldIndices, .numLineDefs=3
+		.floorHeight=-2.0f, .ceilingHeight=2.0f,
+		.lineDefs=ldIndices, .numLineDefs=5
 	};
 }
 //////// INITIALISATION ////////
