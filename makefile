@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = 
 INCLUDE = -I/usr/include -I/usr/local/include
 
-LIBS = -lm -ldl -pthread
+LIBS = -lm -ldl -ludev -pthread
 
 
 SOURCES = main.c src/terminal.c src/io.c src/graphics.c
@@ -19,7 +19,7 @@ release: CFLAGS := -O2 -ffast-math
 release: $(OBJECTS)
 	$(CC) $(OBJECTS) $(LIBS) -o $(BINFILE)
 
-debug: CFLAGS := -g -DDEBUG -DCOLOUR_QUANTISATION
+debug: CFLAGS := -g -DDEBUG -DCOLOUR_QUANTISATION #-DSUPPRESS_FRAMEBUFFER_OUTPUT
 debug: $(OBJECTS)
 	$(CC) $(OBJECTS) $(LIBS) -o $(BINFILE)
 

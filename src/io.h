@@ -4,7 +4,7 @@
 
 
 typedef enum {
-	K_MOVE_FORE, K_MOVE_BACK, K_MOVE_LEFT, K_MOVE_RIGHT,
+	K_MOVE_FORE, K_MOVE_BACK, K_MOVE_LEFT, K_MOVE_RIGHT, K_MOVE_FAST,
 	K_TURN_LEFT, K_TURN_RIGHT,
 	K_QUIT,
 
@@ -14,7 +14,7 @@ extern int keyMap[NUM_KEYS];
 
 
 
-void io_init(void);
+int io_init(void); //Returns success/failiure.
 void io_quit(void);
 
 

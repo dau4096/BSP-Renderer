@@ -118,7 +118,7 @@ void r_drawLineDef(const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t
 	//Project into screen horizontally
 	int startX = r_getCentreX(start, resolution);
 	int endX = r_getCentreX(end, resolution);
-#ifdef SUPRESS_FRAMEBUFFER_OUTPUT
+#ifdef SUPPRESS_FRAMEBUFFER_OUTPUT
 	printf("Start: %d, End: %d\n", startX, endX);
 #endif
 	if (startX == endX) {return; /* Infinitely thin, don't draw. */}

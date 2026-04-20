@@ -46,7 +46,13 @@ int main(void) {
 	t_createFramebuffer(tResPX); //Create framebuffer. (2D pixel data)
 	r_reallocDepthMap(tResPX.x); //Create depthmap. (1D depth data)
 
-	io_init();
+	int ioSuccess = io_init();
+	if (!ioSuccess) {
+		//Failed to find valid keyboard.
+		printf("Failed to find valid keyboard input.\n");
+		io_quit();
+		return -1;
+	}
 	r_initCamera();
 	r_createGeometry();
 
@@ -76,7 +82,7 @@ int main(void) {
 		io_handleInputs(&camera);
 		r_drawFrame(tResPX);
 		
-	#ifndef SUPRESS_FRAMEBUFFER_OUTPUT
+	#ifndef SUPPRESS_FRAMEBUFFER_OUTPUT
 		t_resetCursor();
 		t_drawFramebuffer();
 	#endif
