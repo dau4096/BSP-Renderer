@@ -130,7 +130,8 @@ void r_drawColumn(
 
 void r_drawLineDef(
 	const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t* fbPTR,
-	const int minYBound, const int maxYBound //Range allowed to draw in.
+	const int minYBound, const int maxYBound, //Range allowed to draw in.
+	const int sectorID
 ) {
 	//Interpolate from start-end along the LineDef.
 	Vec2f_t start = vertices[thisLineDef->vStart];
@@ -157,9 +158,6 @@ void r_drawLineDef(
 	//Project into screen horizontally
 	int startX = r_getCentreX(start, resolution);
 	int endX = r_getCentreX(end, resolution);
-#ifdef SUPPRESS_FRAMEBUFFER_OUTPUT
-	printf("Start: %d, End: %d\n", startX, endX);
-#endif
 	if (startX == endX) {return; /* Infinitely thin, don't draw. */}
 
 	//Calculate depth
@@ -185,7 +183,6 @@ void r_drawLineDef(
 
 	//Draw, interpolating.
 	float aspectRatio = (float)(resolution.x) / (float)(resolution.y);
-	//printf("L: %d, R: %d\n", leftMost, rightMost);
 	for (int x=leftMostClamp; x<rightMostClamp; x++) {
 		float t = (float)(x - leftMost) / (float)(range);
 		float invDistance = f_lerp(lInvDepth, rInvDepth, t);
@@ -201,7 +198,7 @@ void r_drawLineDef(
 		};
 		t_quantise(&colour);
 		r_drawColumn(
-			thisLineDef->frontSector,
+			sectorID,
 			x, aspectRatio * invDistance,
 			fbPTR, resolution, colour,
 			minYBound, maxYBound
@@ -212,7 +209,8 @@ void r_drawLineDef(
 
 void r_drawSector(
 	const Sector_t* thisSector, const Vec2i_t resolution, RGB_t* fbPTR,
-	const int minYBound, const int maxYBound //Range allowed to draw in.
+	const int minYBound, const int maxYBound, //Range allowed to draw in.
+	const int sectorID
 ) {
 	//Loop through it's linedefs, drawing those.
 	for (unsigned int secLD=0u; secLD<thisSector->numLineDefs; secLD++) {
@@ -220,7 +218,8 @@ void r_drawSector(
 		const LineDef_t* thisLineDef = lineDefs + ldIndex;
 		r_drawLineDef(
 			thisLineDef, resolution, fbPTR,
-			minYBound, maxYBound
+			minYBound, maxYBound,
+			sectorID
 		);
 	}
 }
@@ -228,7 +227,6 @@ void r_drawSector(
 
 
 void r_drawFrame(const Vec2i_t resolution) {
-	//TBA
 	RGB_t* fbPTR = t_getFramebufferPTR();
 	r_clearDepth(resolution.x); //Reset depth data for this frame.
 
@@ -238,7 +236,8 @@ void r_drawFrame(const Vec2i_t resolution) {
 			//Nonzero number of lines.
 			r_drawSector(
 				thisSector, resolution, fbPTR,
-				0, resolution.y-1
+				0, resolution.y-1,
+				sIndex
 			);
 		}
 	}
@@ -260,11 +259,13 @@ void r_initCamera(void) {
 
 
 void r_createGeometry(void) {
-	vertices[0] = (Vec2f_t){.x=-10.0f, .y=10.0f};
-	vertices[1] = (Vec2f_t){.x=10.0f, .y=10.0f};
-	vertices[2] = (Vec2f_t){.x=15.0f, .y=-10.0f};
+	vertices[0] = (Vec2f_t){.x=-10.0f, .y= 10.0f};
+	vertices[1] = (Vec2f_t){.x= 10.0f, .y= 10.0f};
+	vertices[2] = (Vec2f_t){.x= 15.0f, .y=-10.0f};
 	vertices[3] = (Vec2f_t){.x=-17.5f, .y=-10.0f};
-	vertices[4] = (Vec2f_t){.x=-20.0f, .y=00.0f};
+	vertices[4] = (Vec2f_t){.x=-20.0f, .y=  0.0f};
+	vertices[5] = (Vec2f_t){.x=-30.0f, .y=-10.0f};
+	vertices[6] = (Vec2f_t){.x=-25.0f, .y=  0.0f};
 
 
 
@@ -277,40 +278,72 @@ void r_createGeometry(void) {
 	lineDefs[1] = (LineDef_t){
 		.vStart=1, .vEnd=2,
 		.frontSector=0, .backSector=-1,
-		.colour=RGB_GREEN
+		.colour=RGB_CYAN
 	};
 
 	lineDefs[2] = (LineDef_t){
 		.vStart=2, .vEnd=3,
 		.frontSector=0, .backSector=-1,
-		.colour=RGB_BLUE
+		.colour=RGB_RED
 	};
 
 	lineDefs[3] = (LineDef_t){
 		.vStart=3, .vEnd=4,
-		.frontSector=0, .backSector=-1,
+		.frontSector=0, .backSector=1,
 		.colour=RGB_YELLOW
 	};
 
 	lineDefs[4] = (LineDef_t){
 		.vStart=4, .vEnd=0,
 		.frontSector=0, .backSector=-1,
-		.colour=RGB_CYAN
+		.colour=RGB_RED
+	};
+
+	lineDefs[5] = (LineDef_t){
+		.vStart=3, .vEnd=5,
+		.frontSector=1, .backSector=-1,
+		.colour=RGB_BLUE
+	};
+
+	lineDefs[6] = (LineDef_t){
+		.vStart=5, .vEnd=6,
+		.frontSector=1, .backSector=-1,
+		.colour=RGB_BLUE
+	};
+
+	lineDefs[7] = (LineDef_t){
+		.vStart=6, .vEnd=4,
+		.frontSector=1, .backSector=-1,
+		.colour=RGB_BLUE
 	};
 
 
 
-	unsigned int* ldIndices;
-	ldIndices = calloc(5, sizeof(unsigned int));
-	ldIndices[0] = 0;
-	ldIndices[1] = 1;
-	ldIndices[2] = 2;
-	ldIndices[3] = 3;
-	ldIndices[4] = 4;
+	unsigned int* ldIndicesSector0;
+	ldIndicesSector0 = calloc(5, sizeof(unsigned int));
+	ldIndicesSector0[0] = 0;
+	ldIndicesSector0[1] = 1;
+	ldIndicesSector0[2] = 2;
+	ldIndicesSector0[3] = 3;
+	ldIndicesSector0[4] = 4;
 	sectors[0] = (Sector_t){
-		.floorHeight=-2.0f, .floorColour=RGB_GREY,
+		.floorHeight=-2.0f, .floorColour=RGB_RED,
 		.ceilingHeight=2.0f, .ceilingColour=RGB_WHITE,
-		.lineDefs=ldIndices, .numLineDefs=5
+		.lineDefs=ldIndicesSector0, .numLineDefs=5
+	};
+
+
+
+	unsigned int* ldIndicesSector1;
+	ldIndicesSector1 = calloc(4, sizeof(unsigned int));
+	ldIndicesSector1[0] = 3;
+	ldIndicesSector1[1] = 5;
+	ldIndicesSector1[2] = 6;
+	ldIndicesSector1[3] = 7;
+	sectors[1] = (Sector_t){
+		.floorHeight=-3.0f, .floorColour=RGB_BLUE,
+		.ceilingHeight=3.0f, .ceilingColour=RGB_WHITE,
+		.lineDefs=ldIndicesSector1, .numLineDefs=4
 	};
 }
 //////// INITIALISATION ////////
