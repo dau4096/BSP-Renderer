@@ -7,6 +7,7 @@
 #include "types.h"
 #include "maths.h"
 #include "terminal.h"
+#include "bsp.h"
 
 
 
@@ -52,8 +53,6 @@ Depth_t r_mapDepth(float depthF) {
 	);
 }
 //////// DEPTH MAPPING ////////
-
-
 
 
 
