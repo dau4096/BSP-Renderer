@@ -83,6 +83,8 @@ typedef struct {
 	int frontSector;   //Sector ID this LineDef_t belongs to
 	int backSector;   //-1 if solid wall, else index of neighbouring sector.
 	RGB_t colour;    //Colour to draw.
+					//
+	int isValid;   //Was it created correctly?
 } LineDef_t;
 
 typedef struct {

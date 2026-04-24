@@ -44,7 +44,7 @@ int main(void) {
 	Vec2i_t tResPX = (Vec2i_t){tResChars.x, tResChars.y*2};
 
 	t_createFramebuffer(tResPX); //Create framebuffer. (2D pixel data)
-	r_reallocDepthMap(tResPX.x); //Create depthmap. (1D depth data)
+	r_reallocColumnBuffers(tResPX.x); //Create depthmap. (1D depth data)
 
 	int ioSuccess = io_init();
 	if (!ioSuccess) {
@@ -68,7 +68,7 @@ int main(void) {
 			tResChars = newTResChars;
 			Vec2i_t tResPX = (Vec2i_t){tResChars.x, tResChars.y*2};
 			t_createFramebuffer(tResPX); //Remake framebuffer to the correct resolution.
-			r_reallocDepthMap(tResPX.x); //Reallocate depthmap to the correct width.
+			r_reallocColumnBuffers(tResPX.x); //Reallocate depthmap to the correct width.
 
 		} else {
 			//No need to clear framebuffer if it was reallocated, calloc automatically clears it to black.

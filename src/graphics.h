@@ -11,7 +11,7 @@ extern Camera_t camera;
 
 
 //////// DEPTH MAPPING ////////
-void r_reallocDepthMap(const int width);
+void r_reallocColumnBuffers(const int width);
 //////// DEPTH MAPPING ////////
 
 
