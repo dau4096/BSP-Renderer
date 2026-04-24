@@ -44,17 +44,27 @@ int main(void) {
 	Vec2i_t tResPX = (Vec2i_t){tResChars.x, tResChars.y*2};
 
 	t_createFramebuffer(tResPX); //Create framebuffer. (2D pixel data)
-	r_reallocDepthMap(tResPX.x); //Create depthmap. (1D depth data)
+	r_reallocColumnBuffers(tResPX.x); //Create depthmap. (1D depth data)
 
 	int ioSuccess = io_init();
 	if (!ioSuccess) {
 		//Failed to find valid keyboard.
 		printf("Failed to find valid keyboard input.\n");
 		io_quit();
+		t_deleteFramebuffer();
+		r_freeBSPTree();
 		return -1;
 	}
 	r_initCamera();
-	r_createGeometry();
+	int BSPsuccess = r_createGeometry();
+	if (!BSPsuccess) {
+		//Failed to create the BSP tree.
+		printf("Failed to create the BSP tree.\n");
+		io_quit();
+		t_deleteFramebuffer();
+		r_freeBSPTree();
+		return -1;
+	}
 
 
 	double start;
@@ -68,7 +78,7 @@ int main(void) {
 			tResChars = newTResChars;
 			Vec2i_t tResPX = (Vec2i_t){tResChars.x, tResChars.y*2};
 			t_createFramebuffer(tResPX); //Remake framebuffer to the correct resolution.
-			r_reallocDepthMap(tResPX.x); //Reallocate depthmap to the correct width.
+			r_reallocColumnBuffers(tResPX.x); //Reallocate depthmap to the correct width.
 
 		} else {
 			//No need to clear framebuffer if it was reallocated, calloc automatically clears it to black.
@@ -100,11 +110,16 @@ int main(void) {
 			nanosleep(&ts, NULL);
 		}
 		frameNumber++;
+
+	#ifdef SUPPRESS_FRAMEBUFFER_OUTPUT
+		printf("\n");
+	#endif
 	} while (run && !(keyMap[K_QUIT]));
 	printf("\n");
 
 	t_deleteFramebuffer();
 	io_quit();
+	r_freeBSPTree();
 
 	return 1;
 }

@@ -11,7 +11,7 @@ extern Camera_t camera;
 
 
 //////// DEPTH MAPPING ////////
-void r_reallocDepthMap(const int width);
+void r_reallocColumnBuffers(const int width);
 //////// DEPTH MAPPING ////////
 
 
@@ -24,7 +24,8 @@ void r_drawFrame(const Vec2i_t resolution);
 
 //////// INITIALISATION ////////
 void r_initCamera(void);
-void r_createGeometry(void);
+int r_createGeometry(void);
+void r_freeBSPTree(void);
 //////// INITIALISATION ////////
 
 

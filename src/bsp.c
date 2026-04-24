@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <stdio.h>
 
 #include "types.h"
 #include "graphics.h"
@@ -14,9 +15,6 @@
 #define MAX_SHARE_RATIO 0.95f
 #define MAX_DEPTH 20
 #define MAX_SPLITS 4096
-
-#define MAX(a,b) ((a) > (b) ? (a) : (b))
-#define MIN(a,b) ((a) < (b) ? (a) : (b))
 
 
 
@@ -233,7 +231,7 @@ BSPnode_t bsp_buildRecurse(
 	SplitKey_t* usedSplits, unsigned int numberOfUsedSplits
 ) {
 	if (
-		(numberOfSegments < MIN_SEGMENTS) ||
+		(numberOfSegments <= MIN_SEGMENTS) ||
 		(depth >= MAX_DEPTH) ||
 		(bsp_countUniqueSplits(segments, numberOfSegments) < 2)
 	) {
@@ -243,9 +241,7 @@ BSPnode_t bsp_buildRecurse(
 				.forward=(Vec2f_t){.x=0.0f, .y=1.0f}
 			},
 			.segments=segments, .numSegments=numberOfSegments,
-			.isLeaf=TRUE, .isValid=TRUE,
-			.forwardNode=(BSPnode_t*)(NULL),
-			.behindNode=(BSPnode_t*)(NULL)
+			.isLeaf=TRUE, .isValid=TRUE
 		};
 	}
 
@@ -332,6 +328,9 @@ BSPnode_t bsp_buildRecurse(
 		.isLeaf=FALSE, .isValid=TRUE
 	};
 
+	newNode.forwardNode = malloc(sizeof(BSPnode_t));
+	newNode.behindNode = malloc(sizeof(BSPnode_t));
+
 	//Recurse for front and back.
 	*newNode.forwardNode = bsp_buildRecurse(
 		fronts, numberOfFronts, depth+1,
@@ -416,7 +415,7 @@ void bsp_free(BSPnode_t* node) {
 		bsp_free(node->forwardNode);
 		bsp_free(node->behindNode);
 	}
-	free(node->segments); //Free this node's dataset.
+	//free(node->segments); //Free this node's dataset.
 	node->numSegments = 0u;
 	node->isValid = FALSE; //Can no longer be used.
 }
@@ -431,11 +430,13 @@ void bsp_free(BSPnode_t* node) {
 
 void bsp_walk(
 	const BSPnode_t* node, //Node to process
-	const LineDef_t* lineDefs, //Dataset of linedefs
 	const Vec2f_t cameraPosition, //Used to decide where to recurse into first.
+	const Vec2i_t resolution, //Framebuffer resolution
+	RGB_t* fbPTR, //Framebuffer pointer
 	void (*render)( //Function to call on every segment in every node.
 		const Segment_t, //This segment
-		const LineDef_t* //Dataset of linedefs.
+		const Vec2i_t, //Resolution
+		RGB_t* fbPTR //Framebuffer pointer
 	)
 ) {
 	if (!(node->isValid)) {return; /* Do not try to process. */}
@@ -456,21 +457,23 @@ void bsp_walk(
 		}
 
 		//Recurse into the first node.
+		if (!firstNode) {printf("Segfault first!");}
 		bsp_walk(
-			firstNode, lineDefs, cameraPosition, render
+			firstNode, cameraPosition, resolution, fbPTR, render
 		);
 	}
 
 	//Process every segment within this node specifically.
 	//If not leaf, then these are coplanar segments.
 	for (unsigned int segmentIndex=0u; segmentIndex<node->numSegments; segmentIndex++) {
-		render(node->segments[segmentIndex], lineDefs);
+		render(node->segments[segmentIndex], resolution, fbPTR);
 	}
 
 	if (!(node->isLeaf)) {
 		//Recurse into the other node.
+		if (!lastNode) {printf("Segfault last!");}
 		bsp_walk(
-			lastNode, lineDefs, cameraPosition, render
+			lastNode, cameraPosition, resolution, fbPTR, render
 		);
 	}
 }
