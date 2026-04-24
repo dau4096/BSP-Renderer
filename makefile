@@ -5,7 +5,7 @@ INCLUDE = -I/usr/include -I/usr/local/include
 LIBS = -lm -ldl -ludev -pthread
 
 
-SOURCES = main.c src/terminal.c src/io.c src/graphics.c src/bsp.c
+SOURCES = main.c src/terminal.c src/io.c src/graphics.c
 OBJECTS = $(SOURCES:.c=.o)
 BINFILE = prgm.x86_64
 
