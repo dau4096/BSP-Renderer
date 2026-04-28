@@ -102,6 +102,9 @@ int main(void) {
 
 		double elapsed = now() - start;
 		printf("Frame %d took: %.1lfms Theoretical FPS: %.1lf", frameNumber, elapsed*1000.0, 1.0 / elapsed); //Display real DT.
+	#ifdef SUPPRESS_FRAMEBUFFER_OUTPUT
+		printf("\n");
+	#endif
 		double remaining = DT - elapsed;
 		if (remaining > 0) {
 			struct timespec ts;

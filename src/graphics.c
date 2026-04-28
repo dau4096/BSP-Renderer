@@ -7,7 +7,6 @@
 #include "types.h"
 #include "maths.h"
 #include "terminal.h"
-#include "bsp.h"
 
 
 
@@ -54,7 +53,7 @@ void r_reallocColumnBuffers(const int width) {
 void r_clearColumnBuffers(const Vec2i_t resolution) {
 	memset(lowYMap, (unsigned int)(0x00u), resolution.x * sizeof(Depth_t)); //Reset to all 0x00 (0px, bottom of the screen) values.
 	memset(depthMap, (Depth_t)(0xFFu), resolution.x * sizeof(Depth_t)); //Reset to all 0xFF (255, max depth) values.
-	for (unsigned int* ptr=topYMap; ptr<(topYMap+resolution.y); ptr++) {*ptr = resolution.y; /* Set to all [resY] values. */}
+	for (unsigned int* ptr=topYMap; ptr<(topYMap+resolution.x); ptr++) {*ptr = resolution.y-1; /* Set to all [resY] values. */}
 }
 
 
@@ -105,10 +104,18 @@ void r_getLineDefSectorProjections(
 }
 
 
-void r_drawColumn(
+void r_drawSolidColumn(
 	const int sectorID, int x, float invDistance,
 	RGB_t* fbPTR, const Vec2i_t resolution, RGB_t colour
 ) {
+	Depth_t mappedDepth = r_mapDepth(1.0f / invDistance);
+	if (depthMap[x] <= mappedDepth) {return; /* Occluded */}
+
+	//Check column maps;
+	int minYBound = lowYMap[x];
+	int maxYBound = topYMap[x];
+	if (minYBound == maxYBound) {return; /* Column is full */}
+
 	//Draw this wall collumn.
 	int lowY, topY; //Area this column should span (inside segment)
 	const Sector_t* thisSector = sectors + sectorID;
@@ -119,6 +126,11 @@ void r_drawColumn(
 	int lowYBound=lowYMap[x], topYBound=topYMap[x]; //Extents allowed to fill.
 	int success = r_manageColumnValues(x, &lowY, &topY);
 	if (!success) {return; /* Column is full. */}
+
+
+	//Column is taken, column was solid.
+	lowYMap[x] = 0;
+	topYMap[x] = 0;
 
 
 	//Draws top-to-bottom vertically.
@@ -140,12 +152,109 @@ void r_drawColumn(
 		*ptr = colour; //Magenta for now.
 		ptr += resolution.x;
 	}
+	depthMap[x] = mappedDepth;
 
 	//Draw floor.
 	ptr = fbPTR + x + (resolution.x * topY);
 	for (int y=topY; y<topYBound; y++) {
 		*ptr = thisSector->floorColour;
 		ptr += resolution.x;	
+	}
+}
+
+
+void r_drawPortalColumn(
+	const int closeSectorID, const int farSectorID,
+	int x, float invDistance,
+	RGB_t* fbPTR, const Vec2i_t resolution, RGB_t colour
+) {
+	Depth_t mappedDepth = r_mapDepth(1.0f / invDistance);
+	if (depthMap[x] <= mappedDepth) {return; /* Occluded */}
+
+	//Check column maps;
+	int minYBound = lowYMap[x];
+	int maxYBound = topYMap[x];
+	if (minYBound == maxYBound) {return; /* Column is full */}
+
+	//Draw the ceiling, top part of the wall (if relevant), lower part (if relevant), and floor.
+	//Close sector's projections;
+	int lowYBoundNear, topYBoundNear;
+	const Sector_t* nearSector = sectors + closeSectorID;
+	r_getLineDefSectorProjections(
+		nearSector, invDistance, &lowYBoundNear, &topYBoundNear, resolution
+	);
+	if ((topYBoundNear<minYBound) || (lowYBoundNear>=maxYBound)) {return; /* Completely offscreen vertically. */}
+	lowYBoundNear = fmax(lowYBoundNear, 0);
+	topYBoundNear = fmin(topYBoundNear, resolution.y-1);
+
+	//Far sector's projections;
+	int lowYBoundFar, topYBoundFar;
+	const Sector_t* farSector = sectors + farSectorID;
+	r_getLineDefSectorProjections(
+		farSector, invDistance, &lowYBoundFar, &topYBoundFar, resolution
+	);
+	if ((topYBoundFar<minYBound) || (lowYBoundFar>=maxYBound)) {return; /* Completely offscreen vertically. */}
+	lowYBoundFar = fmax(lowYBoundFar, 0);
+	topYBoundFar = fmin(topYBoundFar, resolution.y-1);
+
+
+	int yLow = fmin(lowYBoundNear, lowYBoundFar);
+	int yTop = fmax(topYBoundNear, topYBoundFar);
+
+
+	RGB_t* ptr;
+	//Draw the ceiling
+	ptr = fbPTR + x + (resolution.x * minYBound);
+	for (int y=minYBound; y<yLow; y++) {
+		*ptr = nearSector->ceilingColour;
+		ptr += resolution.x;	
+	}
+
+	//Draw the lower (Y value, higher onscreen) section of the portal
+	if (lowYBoundNear < lowYBoundFar) {
+		//Draw a connecting wall between them and fill Y fill data.
+		lowYMap[x] = lowYBoundFar;
+		ptr = fbPTR + x + (resolution.x * lowYBoundNear);
+		for (int y=lowYBoundNear; y<lowYBoundFar; y++) {
+			*ptr = colour;
+			ptr += resolution.x;
+		}
+	} else {
+		//Just fill Y fill data.
+		lowYMap[x] = lowYBoundNear;
+		ptr = fbPTR + x + (resolution.x * lowYBoundFar);
+		for (int y=lowYBoundFar; y<lowYBoundNear; y++) {
+			*ptr = nearSector->ceilingColour;
+			ptr += resolution.x;
+		}
+	}
+
+
+	//Draw the upper (Y value, lower onscreen) section of the portal
+	if (topYBoundNear > topYBoundFar) {
+		//Draw a connecting wall between them and fill Y fill data.
+		topYMap[x] = topYBoundFar;
+		ptr = fbPTR + x + (resolution.x * topYBoundFar);
+		for (int y=topYBoundFar; y<topYBoundNear; y++) {
+			*ptr = colour;
+			ptr += resolution.x;
+		}
+	} else {
+		//Just fill Y fill data.
+		topYMap[x] = topYBoundNear;
+		ptr = fbPTR + x + (resolution.x * topYBoundNear);
+		for (int y=topYBoundNear; y<topYBoundFar; y++) {
+			*ptr = nearSector->floorColour;
+			ptr += resolution.x;
+		}
+	}
+
+
+	//Draw the floor
+	ptr = fbPTR + x + (resolution.x * yTop);
+	for (int y=yTop; y<maxYBound; y++) {
+		*ptr = nearSector->floorColour;
+		ptr += resolution.x;
 	}
 }
 
@@ -157,9 +266,10 @@ void r_drawSegment(const Segment_t thisSegment, const Vec2i_t resolution, RGB_t*
 	Vec2f_t start = thisSegment.vStart;
 	Vec2f_t end = thisSegment.vEnd;
 
-
 	float dStart = v2f_dot(camera.forward, v2f_sub(start, camera.position));
 	float dEnd = v2f_dot(camera.forward, v2f_sub(end, camera.position));
+    Vec2f_t dir = v2f_sub(end, start);
+	Vec2f_t normal = (Vec2f_t){.x=-dir.y, .y=dir.x};
 
 	if ((dStart < 0.0f) && (dEnd < 0.0f)) {return;}
 
@@ -167,7 +277,6 @@ void r_drawSegment(const Segment_t thisSegment, const Vec2i_t resolution, RGB_t*
 	if ((dStart < 0.0f) || (dEnd < 0.0f)) {
 	    float t = dStart / (dStart - dEnd);
 
-	    Vec2f_t dir = v2f_sub(end, start);
 	    Vec2f_t clipPoint = v2f_add(start, v2f_mul(dir, t));
 
 	    if (dStart < 0.0f) {start = clipPoint;}
@@ -201,28 +310,55 @@ void r_drawSegment(const Segment_t thisSegment, const Vec2i_t resolution, RGB_t*
 	if ((rightMostClamp < 0) || (leftMostClamp >= resolution.x)) {return; /* Offscreen horizontally */}
 
 
+	LineDef_t* thisLineDef = lineDefs + thisSegment.lineDefIndex;
+	int closeSectorID, farSectorID, isSolid;
+	if (thisLineDef->backSector == -1) {closeSectorID = thisLineDef->frontSector; isSolid=TRUE;}
+	else if (thisLineDef->frontSector == -1) {closeSectorID = thisLineDef->backSector; isSolid=TRUE;}
+	else {
+		//Find which one is closer, assuming the normal points "front".
+		isSolid = FALSE;
+		float dotProd = v2f_dot(normal, v2f_sub(camera.position, start));
+		if (dotProd >= 0.0f) {
+			//Use "Front" sector.
+			closeSectorID = thisLineDef->frontSector;
+			farSectorID = thisLineDef->backSector;
+		} else {
+			//"Back" sector.
+			closeSectorID = thisLineDef->backSector;
+			farSectorID = thisLineDef->frontSector;
+		}
+	}
+
+
 	//Draw, interpolating.
 	for (int x=leftMostClamp; x<rightMostClamp; x++) {
 		float t = (float)(x - leftMost) / (float)(range);
 		float invDistance = f_lerp(lInvDepth, rInvDepth, t);
 		float depthF = 1.0f / invDistance;
 
-		//Check column depth
-		Depth_t mappedDepth = r_mapDepth(depthF);
-		if (depthMap[x] <= mappedDepth) {continue; /* Nearer than current depth. */}
 
-		LineDef_t* thisLineDef = lineDefs + thisSegment.lineDefIndex;
+		float a = (v2f_dot(v2f_normalise(normal), camera.forward) * 0.5f) + 0.5f;
 		RGB_t colour = (RGB_t) {
-			.r=thisLineDef->colour.r*t,
-			.g=thisLineDef->colour.g*t,
-			.b=thisLineDef->colour.b*t
+			.r=thisLineDef->colour.r*a,
+			.g=thisLineDef->colour.g*a,
+			.b=thisLineDef->colour.b*a
 		};
 		t_quantise(&colour);
-		r_drawColumn(
-			thisLineDef->frontSector,
-			x, invDistance,
-			fbPTR, resolution, colour
-		);
+
+
+		if (isSolid) {
+			r_drawSolidColumn(
+				closeSectorID,
+				x, aspectRatio*invDistance,
+				fbPTR, resolution, colour
+			);
+		} else {
+			r_drawPortalColumn(
+				closeSectorID, farSectorID,
+				x, aspectRatio*invDistance,
+				fbPTR, resolution, colour
+			);
+		}
 	}
 }
 
@@ -266,55 +402,78 @@ int r_createGeometry(void) {
 	vertices[4] = (Vec2f_t){.x=-20.0f, .y=  0.0f};
 	vertices[5] = (Vec2f_t){.x=-30.0f, .y=-10.0f};
 	vertices[6] = (Vec2f_t){.x=-25.0f, .y=  0.0f};
+	vertices[7] = (Vec2f_t){.x= 15.0f, .y= 10.0f};
 
 
 
 	lineDefs[0] = (LineDef_t){
 		.vStart=0, .vEnd=1,
 		.frontSector=0, .backSector=-1,
-		.colour=RGB_RED
+		.colour=RGB_RED,
+		.isValid=TRUE
 	};
 
 	lineDefs[1] = (LineDef_t){
 		.vStart=1, .vEnd=2,
-		.frontSector=0, .backSector=-1,
-		.colour=RGB_CYAN
+		.frontSector=2, .backSector=0,
+		.colour=RGB_CYAN,
+		.isValid=TRUE
 	};
 
 	lineDefs[2] = (LineDef_t){
 		.vStart=2, .vEnd=3,
 		.frontSector=0, .backSector=-1,
-		.colour=RGB_RED
+		.colour=RGB_RED,
+		.isValid=TRUE
 	};
 
 	lineDefs[3] = (LineDef_t){
 		.vStart=3, .vEnd=4,
-		.frontSector=0, .backSector=1,
-		.colour=RGB_YELLOW
+		.frontSector=1, .backSector=0,
+		.colour=RGB_YELLOW,
+		.isValid=TRUE
 	};
 
 	lineDefs[4] = (LineDef_t){
 		.vStart=4, .vEnd=0,
 		.frontSector=0, .backSector=-1,
-		.colour=RGB_RED
+		.colour=RGB_RED,
+		.isValid=TRUE
 	};
 
 	lineDefs[5] = (LineDef_t){
 		.vStart=3, .vEnd=5,
 		.frontSector=1, .backSector=-1,
-		.colour=RGB_BLUE
+		.colour=RGB_BLUE,
+		.isValid=TRUE
 	};
 
 	lineDefs[6] = (LineDef_t){
 		.vStart=5, .vEnd=6,
 		.frontSector=1, .backSector=-1,
-		.colour=RGB_BLUE
+		.colour=RGB_BLUE,
+		.isValid=TRUE
 	};
 
 	lineDefs[7] = (LineDef_t){
 		.vStart=6, .vEnd=4,
 		.frontSector=1, .backSector=-1,
-		.colour=RGB_BLUE
+		.colour=RGB_BLUE,
+		.isValid=TRUE
+	};
+
+	lineDefs[8] = (LineDef_t){
+		.vStart=1, .vEnd=7,
+		.frontSector=2, .backSector=-1,
+		.colour=RGB_YELLOW,
+		.isValid=TRUE
+	};
+
+	lineDefs[9] = (LineDef_t){
+		.vStart=7, .vEnd=2,
+		.frontSector=2, .backSector=-1,
+		.colour=RGB_YELLOW,
+		.isValid=TRUE
 	};
 
 
@@ -344,6 +503,19 @@ int r_createGeometry(void) {
 		.floorHeight=-3.0f, .floorColour=RGB_BLUE,
 		.ceilingHeight=3.0f, .ceilingColour=RGB_WHITE,
 		.lineDefs=ldIndicesSector1, .numLineDefs=4
+	};
+
+
+
+	unsigned int* ldIndicesSector2;
+	ldIndicesSector2 = calloc(3, sizeof(unsigned int));
+	ldIndicesSector2[0] = 1;
+	ldIndicesSector2[1] = 8;
+	ldIndicesSector2[2] = 9;
+	sectors[2] = (Sector_t){
+		.floorHeight=-0.5f, .floorColour=RGB_GREEN,
+		.ceilingHeight=0.5f, .ceilingColour=RGB_WHITE,
+		.lineDefs=ldIndicesSector2, .numLineDefs=3
 	};
 
 
