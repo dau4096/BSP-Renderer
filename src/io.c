@@ -23,7 +23,11 @@ int keyMap[NUM_KEYS];
 #include <libudev.h>
 
 
-int fd; //Input path
+#define TEST_BIT(arr, bit) (arr[(bit)/8] & (1 << ((bit)%8)))
+#define MAX_DEVICES 32u
+int fds[MAX_DEVICES];
+unsigned int numFDs = 0;
+
 
 static struct termios oldTermios;
 
@@ -45,13 +49,39 @@ int io_init(void) {
 		const char* path = udev_list_entry_get_name(dev_list_entry);
 		struct udev_device* dev = udev_device_new_from_syspath(udev, path);
 
-		const char* is_kbd = udev_device_get_property_value(dev, "ID_INPUT_KEYBOARD");
-		if (is_kbd && (strcmp(is_kbd, "1") == 0)) {
-			const char* devnode = udev_device_get_devnode(dev); //In the form /dev/input/eventN
+		const char* devnode = udev_device_get_devnode(dev);
+		if (!devnode) { continue; }
 
-			fd = open(devnode, O_RDONLY|O_NONBLOCK);
-			if (fd < 0) {continue; /* Fail */}
+		int fd = open(devnode, O_RDONLY | O_NONBLOCK);
+		if (fd < 0) { continue; }
+
+		unsigned long evbits[(EV_MAX + 7) / 8];
+		memset(evbits, 0, sizeof(evbits));
+
+		if (ioctl(fd, EVIOCGBIT(0, sizeof(evbits)), evbits) < 0) {
+			close(fd);
+			continue;
+		}
+
+		if (!TEST_BIT(evbits, EV_KEY)) {
+			close(fd);
+			continue;
+		}
+
+		unsigned long keybits[(KEY_MAX + 7) / 8];
+		memset(keybits, 0, sizeof(keybits));
+
+		if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keybits)), keybits) < 0) {
+			close(fd);
+			continue;
+		}
+
+		if (numFDs < MAX_DEVICES) {
+			fds[numFDs++] = fd;
+			printf("Using input: %s\n", devnode);
 			found = TRUE;
+		} else {
+			close(fd);
 			break;
 		}
 	}
@@ -76,7 +106,7 @@ int io_init(void) {
 void io_quit(void) {
 	//Restore terminal input
 	tcsetattr(STDIN_FILENO, TCSAFLUSH, &oldTermios);
-	if (fd >= 0) {close(fd);}
+	for (unsigned int fdID=0u; fdID<numFDs; fdID++) {close(fds[fdID]);}
 }
 
 
@@ -103,29 +133,31 @@ int getID(int key) {
 
 #define MAX_EVENTS_PER_FRAME 64
 void io_pollEvents(void) {
-	struct input_event ev;
-	size_t count = 0;
+	for (unsigned int fdID=0u; fdID<numFDs; fdID++) {
+		struct input_event ev;
+		size_t count = 0;
 
-	while (count < MAX_EVENTS_PER_FRAME) {
-		ssize_t n = read(fd, &ev, sizeof(ev));
+		while (count < MAX_EVENTS_PER_FRAME) {
+			ssize_t n = read(fds[fdID], &ev, sizeof(ev));
 
-		if (n > 0) {
-			if (n != sizeof(ev)) {continue;}
+			if (n > 0) {
+				if (n != sizeof(ev)) {continue;}
 
-			if (ev.type == EV_KEY) {
-				int ID = getID(ev.code);
-				if (ID < NUM_KEYS) {keyMap[ID] = (ev.value != 0); /* Update keyMap */}
+				if (ev.type == EV_KEY) {
+					int ID = getID(ev.code);
+					if (ID < NUM_KEYS) {keyMap[ID] = (ev.value != 0); /* Update keyMap */}
+				}
+
+				count++;
 			}
+			else {
+				if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {break; /* Stop, ran out. */}
+				if (errno == EINTR) {continue; /* Interrupted, retry. */}
 
-			count++;
-		}
-		else {
-			if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {break; /* Stop, ran out. */}
-			if (errno == EINTR) {continue; /* Interrupted, retry. */}
-
-			//Error;
-			perror("read");
-			break;
+				//Error;
+				perror("read");
+				break;
+			}
 		}
 	}
 }
