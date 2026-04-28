@@ -24,18 +24,18 @@ Camera_t camera; //The view
 Vec2f_t vertices[MAX_VERTICES]; //2D positions.
 LineDef_t lineDefs[MAX_LINEDEFS]; //LineDefs connecting vertices.
 Sector_t sectors[MAX_SECTORS]; //Sectors made of LineDefs.
+
+BSPnode_t BSPtreeRoot; //Root of the BSP tree.
 //////// DATA ////////
 
 
 
 
-//////// DEPTH MAPPING ////////
+//////// COLUMN DATA ////////
 typedef uint8_t Depth_t;
 Depth_t* depthMap; //1D depthmap.
-
-//Vertical ranges allowed to draw in;
-unsigned int* lowYMap;
-unsigned int* topYMap;
+unsigned int* lowYMap; //Lowest pixel of each column allowed to be drawn to
+unsigned int* topYMap; //Highest pixel of each column allowed to be drawn to
 
 
 void r_reallocColumnBuffers(const int width) {
@@ -62,7 +62,19 @@ Depth_t r_mapDepth(float depthF) {
 		fmin(depthF / camera.maxDistance, 1.0f) * 255.0f //Remap to 0-255.
 	);
 }
-//////// DEPTH MAPPING ////////
+
+
+int r_manageColumnValues(unsigned int x, unsigned int* lowYBound, unsigned int* topYBound) { //Returns success.
+	//Check column is writeable
+	if (lowYMap[x] >= topYMap[x]) {return FALSE; /* Column is already full. */}
+
+	//Replace values in the maps.
+	*lowYBound = MAX(*lowYBound, lowYMap[x]);
+	*topYBound = MAX(*topYBound, topYMap[x]);
+
+	return TRUE; //Success.
+}
+//////// COLUMN DATA ////////
 
 
 
@@ -82,13 +94,13 @@ int r_getCentreX(const Vec2f_t position, const Vec2i_t resolution) {
 
 
 void r_getLineDefSectorProjections(
-	const Sector_t* thisSector, float invDistance, int* lowYBound, int* topYBound, const Vec2i_t resolution
+	const Sector_t* thisSector, float invDistance, int* lowY, int* topY, const Vec2i_t resolution
 ) {
 	float projectedYFloor = (cameraZ - thisSector->floorHeight) * invDistance;
 	float projectedYCeiling = (cameraZ - thisSector->ceilingHeight) * invDistance;
 
-	*lowYBound = (int)((float)(resolution.y) * (0.5f - projectedYFloor));
-	*topYBound = (int)((float)(resolution.y) * (0.5f - projectedYCeiling));
+	*lowY = (int)((float)(resolution.y) * (0.5f - projectedYFloor));
+	*topY = (int)((float)(resolution.y) * (0.5f - projectedYCeiling));
 }
 
 
@@ -105,15 +117,16 @@ void r_drawSolidColumn(
 	if (minYBound == maxYBound) {return; /* Column is full */}
 
 	//Draw this wall collumn.
-	int lowYBound, topYBound;
+	int lowY, topY; //Area this column should span (inside segment)
 	const Sector_t* thisSector = sectors + sectorID;
 	r_getLineDefSectorProjections(
-		thisSector, invDistance, &lowYBound, &topYBound, resolution
+		thisSector, invDistance, &lowY, &topY, resolution
 	);
-	if ((topYBound<minYBound) || (lowYBound>=maxYBound)) {return; /* Completely offscreen vertically. */}
 
-	int yLow = fmax(lowYBound, minYBound);
-	int yTop = fmin(topYBound, maxYBound);
+	int lowYBound=lowYMap[x], topYBound=topYMap[x]; //Extents allowed to fill.
+	int success = r_manageColumnValues(x, &lowY, &topY);
+	if (!success) {return; /* Column is full. */}
+
 
 	//Column is taken, column was solid.
 	lowYMap[x] = 0;
@@ -122,26 +135,28 @@ void r_drawSolidColumn(
 
 	//Draws top-to-bottom vertically.
 	RGB_t* ptr;
+	lowY = fmax(lowY, 0);
+	topY = fmin(topY, resolution.y);
 
 	//Draw ceiling.
-	ptr = fbPTR + x + (resolution.x * minYBound);
-	for (int y=minYBound; y<yLow; y++) {
+	ptr = fbPTR + x + (resolution.x * lowYBound);
+	for (int y=lowYBound; y<lowY; y++) {
 		*ptr = thisSector->ceilingColour;
-		ptr += resolution.x;	
+		ptr += resolution.x;
 	}
 
 	//Draw wall.
-	ptr = fbPTR + x + (resolution.x * yLow);
-	for (int y=yLow; y<yTop; y++) {
-		//Texturing TBA. yLow is low INDEX not low ONSCREEN.
+	ptr = fbPTR + x + (resolution.x * lowY);
+	for (int y=lowY; y<topY; y++) {
+		//Texturing TBA. lowY is low INDEX not low ONSCREEN.
 		*ptr = colour; //Magenta for now.
 		ptr += resolution.x;
 	}
 	depthMap[x] = mappedDepth;
 
 	//Draw floor.
-	ptr = fbPTR + x + (resolution.x * yTop);
-	for (int y=yTop; y<maxYBound; y++) {
+	ptr = fbPTR + x + (resolution.x * topY);
+	for (int y=topY; y<topYBound; y++) {
 		*ptr = thisSector->floorColour;
 		ptr += resolution.x;	
 	}
@@ -245,20 +260,18 @@ void r_drawPortalColumn(
 
 
 
-void r_drawLineDef(
-	const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t* fbPTR
-) {
-	//Interpolate from start-end along the LineDef.
-	Vec2f_t start = vertices[thisLineDef->vStart];
-	Vec2f_t end = vertices[thisLineDef->vEnd];
 
+void r_drawSegment(const Segment_t thisSegment, const Vec2i_t resolution, RGB_t* fbPTR) {
+	//Interpolate from start-end along the Segment.
+	Vec2f_t start = thisSegment.vStart;
+	Vec2f_t end = thisSegment.vEnd;
 
 	float dStart = v2f_dot(camera.forward, v2f_sub(start, camera.position));
 	float dEnd = v2f_dot(camera.forward, v2f_sub(end, camera.position));
     Vec2f_t dir = v2f_sub(end, start);
 	Vec2f_t normal = (Vec2f_t){.x=-dir.y, .y=dir.x};
 
-	if ((dStart < 0.0f) && (dEnd < 0.0f)) return;
+	if ((dStart < 0.0f) && (dEnd < 0.0f)) {return;}
 
 	//If one point is behind, clip it.
 	if ((dStart < 0.0f) || (dEnd < 0.0f)) {
@@ -297,6 +310,7 @@ void r_drawLineDef(
 	if ((rightMostClamp < 0) || (leftMostClamp >= resolution.x)) {return; /* Offscreen horizontally */}
 
 
+	LineDef_t* thisLineDef = lineDefs + thisSegment.lineDefIndex;
 	int closeSectorID, farSectorID, isSolid;
 	if (thisLineDef->backSector == -1) {closeSectorID = thisLineDef->frontSector; isSolid=TRUE;}
 	else if (thisLineDef->frontSector == -1) {closeSectorID = thisLineDef->backSector; isSolid=TRUE;}
@@ -317,10 +331,11 @@ void r_drawLineDef(
 
 
 	//Draw, interpolating.
-	float aspectRatio = (float)(resolution.x) / (float)(resolution.y);
 	for (int x=leftMostClamp; x<rightMostClamp; x++) {
 		float t = (float)(x - leftMost) / (float)(range);
 		float invDistance = f_lerp(lInvDepth, rInvDepth, t);
+		float depthF = 1.0f / invDistance;
+
 
 		float a = (v2f_dot(v2f_normalise(normal), camera.forward) * 0.5f) + 0.5f;
 		RGB_t colour = (RGB_t) {
@@ -329,6 +344,8 @@ void r_drawLineDef(
 			.b=thisLineDef->colour.b*a
 		};
 		t_quantise(&colour);
+
+
 		if (isSolid) {
 			r_drawSolidColumn(
 				closeSectorID,
@@ -349,15 +366,19 @@ void r_drawLineDef(
 
 void r_drawFrame(const Vec2i_t resolution) {
 	RGB_t* fbPTR = t_getFramebufferPTR();
-	r_clearColumnBuffers(resolution); //Reset depth data for this frame.
+	r_clearColumnBuffers(resolution); //Reset depth data & column bottom/top data for this frame.
 
-	for (unsigned int ldIndex=0u; ldIndex<MAX_LINEDEFS; ldIndex++) {
-		const LineDef_t* thisLineDef = lineDefs+ldIndex;
-		if (!(thisLineDef->isValid)) {continue;}
-		r_drawLineDef(thisLineDef, resolution, fbPTR);
-	}
+	bsp_walk(
+		&BSPtreeRoot, camera.position, //BSP parameters
+		resolution, fbPTR, //Function parameters
+		r_drawSegment //Function
+	);
 }
 //////// DRAWING ////////
+
+
+
+
 
 
 
@@ -373,7 +394,7 @@ void r_initCamera(void) {
 
 
 
-void r_createGeometry(void) {
+int r_createGeometry(void) {
 	vertices[0] = (Vec2f_t){.x=-10.0f, .y= 10.0f};
 	vertices[1] = (Vec2f_t){.x= 10.0f, .y= 10.0f};
 	vertices[2] = (Vec2f_t){.x= 15.0f, .y=-10.0f};
@@ -496,6 +517,20 @@ void r_createGeometry(void) {
 		.ceilingHeight=0.5f, .ceilingColour=RGB_WHITE,
 		.lineDefs=ldIndicesSector2, .numLineDefs=3
 	};
+
+
+	int success;
+	BSPtreeRoot = bsp_build(
+		vertices, MAX_VERTICES,
+		lineDefs, MAX_LINEDEFS,
+		&success
+	);
+	return success;
+}
+
+
+void r_freeBSPTree(void) {
+	bsp_free(&BSPtreeRoot);
 }
 //////// INITIALISATION ////////
 

@@ -51,10 +51,20 @@ int main(void) {
 		//Failed to find valid keyboard.
 		printf("Failed to find valid keyboard input.\n");
 		io_quit();
+		t_deleteFramebuffer();
+		r_freeBSPTree();
 		return -1;
 	}
 	r_initCamera();
-	r_createGeometry();
+	int BSPsuccess = r_createGeometry();
+	if (!BSPsuccess) {
+		//Failed to create the BSP tree.
+		printf("Failed to create the BSP tree.\n");
+		io_quit();
+		t_deleteFramebuffer();
+		r_freeBSPTree();
+		return -1;
+	}
 
 
 	double start;
@@ -103,11 +113,16 @@ int main(void) {
 			nanosleep(&ts, NULL);
 		}
 		frameNumber++;
+
+	#ifdef SUPPRESS_FRAMEBUFFER_OUTPUT
+		printf("\n");
+	#endif
 	} while (run && !(keyMap[K_QUIT]));
 	printf("\n");
 
 	t_deleteFramebuffer();
 	io_quit();
+	r_freeBSPTree();
 
 	return 1;
 }
