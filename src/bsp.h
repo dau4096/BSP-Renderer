@@ -26,7 +26,8 @@ void bsp_walk(
 		const Segment_t, //This segment
 		const Vec2i_t, //Resolution
 		RGB_t* fbPTR //Framebuffer Pointer
-	)
+	),
+	unsigned int depth //Current recursion depth
 );
 //////// WALKING THE BSP ////////
 

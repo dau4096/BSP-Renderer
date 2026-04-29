@@ -67,7 +67,7 @@ int main(void) {
 	}
 
 
-	double start;
+	double start, dt;
 	unsigned int frameNumber = 0u;
 	do { //Frameloop
 		start = now();
@@ -89,7 +89,7 @@ int main(void) {
 
 
 		//Tasks for this frame;
-		io_handleInputs(&camera);
+		io_handleInputs(&camera, dt);
 		r_drawFrame(tResPX);
 		
 	#ifndef SUPPRESS_FRAMEBUFFER_OUTPUT
@@ -100,13 +100,13 @@ int main(void) {
 
 
 
-		double elapsed = now() - start;
-		printf("Frame %d took: %.1lfms Theoretical FPS: %.1lf", frameNumber, elapsed*1000.0, 1.0 / elapsed); //Display real DT.
+		dt = now() - start;
+		printf("Frame %d took: %.3lfms Theoretical FPS: %.0lf", frameNumber, dt*1000.0, 1.0 / dt); //Display real DT.
 	#ifdef SUPPRESS_FRAMEBUFFER_OUTPUT
 		printf("\n");
 	#endif
-		double remaining = DT - elapsed;
-		if (remaining > 0) {
+		double remaining = DT - dt; //Max - actual
+		if (0 && remaining > 0) {
 			struct timespec ts;
 			ts.tv_sec = (time_t)(remaining);
 			ts.tv_nsec = (long)((remaining - ts.tv_sec) * 1.0e9);

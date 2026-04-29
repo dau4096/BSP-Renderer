@@ -38,9 +38,9 @@ float bsp_scoringFunction(
 	float imbalance = balancePenalty / (float)(total);
 
 	return (
-		(splitCost * 2.0f) +
+		(splitCost * 3.0f) +
 		(imbalance * 5.0f) +
-		(balancePenalty * 1.0f) +
+		//(balancePenalty * 1.0f) +
 		(recursionDepth * 0.2f)
 	);
 }
@@ -54,22 +54,33 @@ Vec2f_t bsp_getDirection(const Segment_t segment) {
 	return (Vec2f_t){.x=-delta.y, .y=delta.x};
 }
 
-
+#define NUM_AXIS 4u
+const Vec2f_t axes[NUM_AXIS] = {
+	(Vec2f_t){.x= 1.0f, .y= 0.0f},
+	(Vec2f_t){.x=-1.0f, .y= 0.0f},
+	(Vec2f_t){.x= 0.0f, .y= 1.0f},
+	(Vec2f_t){.x= 0.0f, .y=-1.0f}
+};
 void bsp_pickCandidateSplits(
 	const Segment_t* segments, const unsigned int numberOfSegments, //In
 	Split_t* splits, unsigned int* numberOfSplits //Out
 ) {
 	for (unsigned int i=0u; i<numberOfSegments; i++) {
 		Segment_t segment = segments[i];
-		Vec2f_t direction = bsp_getDirection(segment);
+		Vec2f_t normal = bsp_getDirection(segment);
+		Vec2f_t backNormal = v2f_mul(normal, -1.0f);
+		Vec2f_t offsetPos = v2f_add(segment.vStart, v2f_mul(normal, 0.001f));
 
-		splits[(*numberOfSplits)++] = (Split_t){.position=segment.vStart, .forward=direction};
+		splits[(*numberOfSplits)++] = (Split_t){.position=offsetPos, .forward=normal};
+		splits[(*numberOfSplits)++] = (Split_t){.position=offsetPos, .forward=backNormal};
 
 		Vec2f_t mid = v2f_mul(v2f_add(segment.vStart, segment.vEnd), 0.5f);
-		splits[(*numberOfSplits)++] = (Split_t){.position=mid, .forward=direction};
-
-		Vec2f_t normal = (Vec2f_t){.x=-direction.y, .y=direction.x};
 		splits[(*numberOfSplits)++] = (Split_t){.position=mid, .forward=normal};
+		splits[(*numberOfSplits)++] = (Split_t){.position=mid, .forward=backNormal};
+
+		for (unsigned int axID=0u; axID<NUM_AXIS; axID++) {
+			splits[(*numberOfSplits)++] = (Split_t){.position=mid, .forward=axes[axID]};
+		}
 	}
 }
 
@@ -146,14 +157,26 @@ void bsp_evaluateSplit(
 }
 
 
+
+Vec2f_t canonicalise(Vec2f_t forward) {
+	if (
+		(forward.x < 0.0f) ||
+		((fabsf(forward.x) < EPSILON) && (fabsf(forward.y) < EPSILON))
+	) {
+		return (Vec2f_t){.x=-forward.x, .y=-forward.y};
+	}
+	return forward;
+}
+
 #define SPLIT_SCALE 1.0e3f
 SplitKey_t bsp_splitKey(const Split_t split) {
+	Vec2f_t forward = canonicalise(split.forward);
 	return (SplitKey_t){
 		.p=(Vec2i_t){
 			.x=split.position.x*SPLIT_SCALE, .y=split.position.y*SPLIT_SCALE
 		},
 		.f=(Vec2i_t){
-			.x=split.forward.x*SPLIT_SCALE, .y=split.forward.y*SPLIT_SCALE
+			.x=forward.x*SPLIT_SCALE, .y=forward.y*SPLIT_SCALE
 		}
 	};
 }
@@ -265,12 +288,14 @@ BSPnode_t bsp_buildRecurse(
 
 		float divisor = (float)(MAX(1, numberOfSegments));
 		if (
+			(MIN(front, back) < 2) ||
+			((float)(splits) / (float)(numberOfSegments) > 0.5f) ||
 			(((float)(splits) / divisor) > MAX_SPLIT_RATIO) ||
 			(((float)(MAX(front, back)) / divisor) > MAX_SHARE_RATIO)
 		) {continue; /* Not worth partitioning by. */}
+		printf("Split: F=%u B=%u S=%u\n", front, back, splits);
 
 		float score = bsp_scoringFunction(splits, front, back, depth);
-		if (MIN(front, back) == 0) {score += 500; /* Heavily disincentivise empty sides. */}
 		candidates[numberOfCandidates++] = (Candidate_t){
 			.score=score, .split=split
 		};
@@ -437,7 +462,8 @@ void bsp_walk(
 		const Segment_t, //This segment
 		const Vec2i_t, //Resolution
 		RGB_t* fbPTR //Framebuffer pointer
-	)
+	),
+	unsigned int depth //Current recursion depth
 ) {
 	if (!(node->isValid)) {return; /* Do not try to process. */}
 
@@ -459,12 +485,13 @@ void bsp_walk(
 		//Recurse into the first node.
 		if (!firstNode) {printf("Segfault first!");}
 		bsp_walk(
-			firstNode, cameraPosition, resolution, fbPTR, render
+			firstNode, cameraPosition, resolution, fbPTR, render, depth+1
 		);
 	}
 
 	//Process every segment within this node specifically.
 	//If not leaf, then these are coplanar segments.
+	//printf("Node depth %u: %u segs, leaf=%d\n", depth, node->numSegments, node->isLeaf);
 	for (unsigned int segmentIndex=0u; segmentIndex<node->numSegments; segmentIndex++) {
 		render(node->segments[segmentIndex], resolution, fbPTR);
 	}
@@ -473,7 +500,7 @@ void bsp_walk(
 		//Recurse into the other node.
 		if (!lastNode) {printf("Segfault last!");}
 		bsp_walk(
-			lastNode, cameraPosition, resolution, fbPTR, render
+			lastNode, cameraPosition, resolution, fbPTR, render, depth+1
 		);
 	}
 }
