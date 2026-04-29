@@ -163,15 +163,15 @@ void r_getLineDefSectorProjections(
 
 
 void r_drawSolidColumn(
-	const int sectorID, int x, float invDistance,
+	const int sectorID, int screenX, float invDistance, int textureX,
 	RGB_t* fbPTR, const Vec2i_t resolution, unsigned int textureID
 ) {
 	Depth_t mappedDepth = r_mapDepth(1.0f / invDistance);
-	if (depthMap[x] <= mappedDepth) {return; /* Occluded */}
+	if (depthMap[screenX] <= mappedDepth) {return; /* Occluded */}
 
 	//Check column maps;
-	int minYBound = lowYMap[x];
-	int maxYBound = topYMap[x];
+	int minYBound = lowYMap[screenX];
+	int maxYBound = topYMap[screenX];
 	if (minYBound == maxYBound) {return; /* Column is full */}
 
 	//Draw this wall collumn.
@@ -186,17 +186,17 @@ void r_drawSolidColumn(
 	int yTop = fmin(topYBound, maxYBound);
 
 	//Column is taken, column was solid.
-	lowYMap[x] = 0;
-	topYMap[x] = 0;
+	lowYMap[screenX] = 0;
+	topYMap[screenX] = 0;
 
 
 
 #ifdef DEBUG_BORDERS
 	//Draw ceiling border.
-	*(fbPTR + x + (resolution.x * yLow)) = RGB_RED;
+	*(fbPTR + screenX + (resolution.x * yLow)) = RGB_RED;
 
 	//Draw floor border.
-	*(fbPTR + x + (resolution.x * yTop)) = RGB_RED;
+	*(fbPTR + screenX + (resolution.x * yTop)) = RGB_RED;
 
 #else
 
@@ -204,24 +204,25 @@ void r_drawSolidColumn(
 	RGB_t* ptr;
 
 	//Draw ceiling.
-	ptr = fbPTR + x + (resolution.x * minYBound);
+	ptr = fbPTR + screenX + (resolution.x * minYBound);
 	for (int y=minYBound; y<yLow; y++) {
 		*ptr = thisSector->ceilingColour;
-		ptr += resolution.x;	
+		ptr += resolution.x;
 	}
 
 	//Draw wall.
-	ptr = fbPTR + x + (resolution.x * yLow);
+	ptr = fbPTR + screenX + (resolution.x * yLow);
 	RGB_t* texPTR;
-	if (!r_getColumn(textureID, x, &texPTR)) {return;}
+	if (!r_getColumn(textureID, textureX, &texPTR)) {return;}
 	for (int y=yLow; y<yTop; y++) {
-		*ptr = *texPTR;
+		float t = (float)(y - lowYBound) / (float)(topYBound - lowYBound);
+		*ptr = *(texPTR + (int)(t * (float)(TEXTURE_RESOLUTION.y)));
 		ptr += resolution.x;
 	}
-	depthMap[x] = mappedDepth;
+	depthMap[screenX] = mappedDepth;
 
 	//Draw floor.
-	ptr = fbPTR + x + (resolution.x * yTop);
+	ptr = fbPTR + screenX + (resolution.x * yTop);
 	for (int y=yTop; y<maxYBound; y++) {
 		*ptr = thisSector->floorColour;
 		ptr += resolution.x;	
@@ -232,37 +233,37 @@ void r_drawSolidColumn(
 
 void r_drawPortalColumn(
 	const int closeSectorID, const int farSectorID,
-	int x, float invDistance,
+	int screenX, float invDistance, int textureX,
 	RGB_t* fbPTR, const Vec2i_t resolution, unsigned int textureID
 ) {
 	Depth_t mappedDepth = r_mapDepth(1.0f / invDistance);
-	if (depthMap[x] <= mappedDepth) {return; /* Occluded */}
+	if (depthMap[screenX] <= mappedDepth) {return; /* Occluded */}
 
 	//Check column maps;
-	int minYBound = lowYMap[x];
-	int maxYBound = topYMap[x];
+	int minYBound = lowYMap[screenX];
+	int maxYBound = topYMap[screenX];
 	if (minYBound == maxYBound) {return; /* Column is full */}
 
 	//Draw the ceiling, top part of the wall (if relevant), lower part (if relevant), and floor.
 	//Close sector's projections;
-	int lowYBoundNear, topYBoundNear;
+	int lowYBoundNearUnclamp, topYBoundNearUnclamp;
 	const Sector_t* nearSector = sectors + closeSectorID;
 	r_getLineDefSectorProjections(
-		nearSector, invDistance, &lowYBoundNear, &topYBoundNear, resolution
+		nearSector, invDistance, &lowYBoundNearUnclamp, &topYBoundNearUnclamp, resolution
 	);
-	if ((topYBoundNear<minYBound) || (lowYBoundNear>=maxYBound)) {return; /* Completely offscreen vertically. */}
-	lowYBoundNear = fmax(lowYBoundNear, 0);
-	topYBoundNear = fmin(topYBoundNear, resolution.y-1);
+	if ((topYBoundNearUnclamp<minYBound) || (lowYBoundNearUnclamp>=maxYBound)) {return; /* Completely offscreen vertically. */}
+	int lowYBoundNear = fmax(lowYBoundNearUnclamp, minYBound);
+	int topYBoundNear = fmin(topYBoundNearUnclamp, maxYBound);
 
 	//Far sector's projections;
-	int lowYBoundFar, topYBoundFar;
+	int lowYBoundFarUnclamp, topYBoundFarUnclamp;
 	const Sector_t* farSector = sectors + farSectorID;
 	r_getLineDefSectorProjections(
-		farSector, invDistance, &lowYBoundFar, &topYBoundFar, resolution
+		farSector, invDistance, &lowYBoundFarUnclamp, &topYBoundFarUnclamp, resolution
 	);
-	if ((topYBoundFar<minYBound) || (lowYBoundFar>=maxYBound)) {return; /* Completely offscreen vertically. */}
-	lowYBoundFar = fmax(lowYBoundFar, 0);
-	topYBoundFar = fmin(topYBoundFar, resolution.y-1);
+	if ((topYBoundFarUnclamp<minYBound) || (lowYBoundFarUnclamp>=maxYBound)) {return; /* Completely offscreen vertically. */}
+	int lowYBoundFar = fmax(lowYBoundFarUnclamp, minYBound);
+	int topYBoundFar = fmin(topYBoundFarUnclamp, maxYBound);
 
 
 	int yLow = fmin(lowYBoundNear, lowYBoundFar);
@@ -274,27 +275,27 @@ void r_drawPortalColumn(
 	//Draw lower border
 	if (lowYBoundNear < lowYBoundFar) {
 		//Draw a connecting wall between them and fill Y fill data.
-		lowYMap[x] = lowYBoundFar;
-		*(fbPTR + x + (resolution.x * lowYBoundFar)) = RGB_MAGENTA;
-		*(fbPTR + x + (resolution.x * lowYBoundNear)) = RGB_BLUE;
+		lowYMap[screenX] = lowYBoundFar;
+		*(fbPTR + screenX + (resolution.x * lowYBoundFar)) = RGB_MAGENTA;
+		*(fbPTR + screenX + (resolution.x * lowYBoundNear)) = RGB_BLUE;
 	} else {
 		//Just fill Y fill data.
-		lowYMap[x] = lowYBoundNear;
-		*(fbPTR + x + (resolution.x * lowYBoundNear)) = RGB_MAGENTA;
-		*(fbPTR + x + (resolution.x * lowYBoundFar)) = RGB_BLUE;
+		lowYMap[screenX] = lowYBoundNear;
+		*(fbPTR + screenX + (resolution.x * lowYBoundNear)) = RGB_MAGENTA;
+		*(fbPTR + screenX + (resolution.x * lowYBoundFar)) = RGB_BLUE;
 	}
 
 	//Draw upper border.
 	if (topYBoundNear > topYBoundFar) {
 		//Draw a connecting wall between them and fill Y fill data.
-		topYMap[x] = topYBoundFar;
-		*(fbPTR + x + (resolution.x * topYBoundFar)) = RGB_MAGENTA;
-		*(fbPTR + x + (resolution.x * topYBoundNear)) = RGB_BLUE;
+		topYMap[screenX] = topYBoundFar;
+		*(fbPTR + screenX + (resolution.x * topYBoundFar)) = RGB_MAGENTA;
+		*(fbPTR + screenX + (resolution.x * topYBoundNear)) = RGB_BLUE;
 	} else {
 		//Just fill Y fill data.
-		topYMap[x] = topYBoundNear;
-		*(fbPTR + x + (resolution.x * topYBoundNear)) = RGB_MAGENTA;
-		*(fbPTR + x + (resolution.x * topYBoundFar)) = RGB_BLUE;
+		topYMap[screenX] = topYBoundNear;
+		*(fbPTR + screenX + (resolution.x * topYBoundNear)) = RGB_MAGENTA;
+		*(fbPTR + screenX + (resolution.x * topYBoundFar)) = RGB_BLUE;
 	}
 
 
@@ -305,7 +306,7 @@ void r_drawPortalColumn(
 
 
 	//Draw the ceiling
-	ptr = fbPTR + x + (resolution.x * minYBound);
+	ptr = fbPTR + screenX + (resolution.x * minYBound);
 	for (int y=minYBound; y<yLow; y++) {
 		*ptr = nearSector->ceilingColour;
 		ptr += resolution.x;	
@@ -313,19 +314,20 @@ void r_drawPortalColumn(
 
 	//Draw the lower (Y value, higher onscreen) section of the portal
 	RGB_t* texPTR;
-	if (!r_getColumn(textureID, x, &texPTR)) {return;}
+	if (!r_getColumn(textureID, textureX, &texPTR)) {return;}
 	if (lowYBoundNear < lowYBoundFar) {
 		//Draw a connecting wall between them and fill Y fill data.
-		lowYMap[x] = lowYBoundFar;
-		ptr = fbPTR + x + (resolution.x * lowYBoundNear);
+		lowYMap[screenX] = lowYBoundFar;
+		ptr = fbPTR + screenX + (resolution.x * lowYBoundNear);
 		for (int y=lowYBoundNear; y<lowYBoundFar; y++) {
-			*ptr = *texPTR;
+			float t = (float)(y - lowYBoundNearUnclamp) / (float)(lowYBoundFarUnclamp - lowYBoundNearUnclamp);
+			*ptr = *(texPTR + (int)(t * (float)TEXTURE_RESOLUTION.y));
 			ptr += resolution.x;
 		}
 	} else {
 		//Just fill Y fill data.
-		lowYMap[x] = lowYBoundNear;
-		ptr = fbPTR + x + (resolution.x * lowYBoundFar);
+		lowYMap[screenX] = lowYBoundNear;
+		ptr = fbPTR + screenX + (resolution.x * lowYBoundFar);
 		for (int y=lowYBoundFar; y<lowYBoundNear; y++) {
 			*ptr = nearSector->ceilingColour;
 			ptr += resolution.x;
@@ -336,16 +338,17 @@ void r_drawPortalColumn(
 	//Draw the upper (Y value, lower onscreen) section of the portal
 	if (topYBoundNear > topYBoundFar) {
 		//Draw a connecting wall between them and fill Y fill data.
-		topYMap[x] = topYBoundFar;
-		ptr = fbPTR + x + (resolution.x * topYBoundFar);
+		topYMap[screenX] = topYBoundFar;
+		ptr = fbPTR + screenX + (resolution.x * topYBoundFar);
 		for (int y=topYBoundFar; y<topYBoundNear; y++) {
-			*ptr = *texPTR;
+			float t = (float)(y - topYBoundFarUnclamp) / (float)(topYBoundNearUnclamp - topYBoundFarUnclamp);
+			*ptr = *(texPTR + (int)(t * (float)TEXTURE_RESOLUTION.y));
 			ptr += resolution.x;
 		}
 	} else {
 		//Just fill Y fill data.
-		topYMap[x] = topYBoundNear;
-		ptr = fbPTR + x + (resolution.x * topYBoundNear);
+		topYMap[screenX] = topYBoundNear;
+		ptr = fbPTR + screenX + (resolution.x * topYBoundNear);
 		for (int y=topYBoundNear; y<topYBoundFar; y++) {
 			*ptr = nearSector->floorColour;
 			ptr += resolution.x;
@@ -354,7 +357,7 @@ void r_drawPortalColumn(
 
 
 	//Draw the floor
-	ptr = fbPTR + x + (resolution.x * yTop);
+	ptr = fbPTR + screenX + (resolution.x * yTop);
 	for (int y=yTop; y<maxYBound; y++) {
 		*ptr = nearSector->floorColour;
 		ptr += resolution.x;
@@ -436,21 +439,24 @@ void r_drawLineDef(const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t
 
 	//Draw, interpolating.
 	float aspectRatio = (float)(resolution.x) / (float)(resolution.y);
-	for (int x=leftMostClamp; x<rightMostClamp; x++) {
-		float t = (float)(x - leftMost) / (float)(range);
+	float textureX = 0.0f;
+	for (int screenX=leftMostClamp; screenX<rightMostClamp; screenX++) {
+		float t = (float)(screenX - leftMost) / (float)(range);
 		float invDistance = f_lerp(lInvDepth, rInvDepth, t);
 		float depthF = 1.0f / invDistance;
+
+		textureX = (int)(t * (float)(TEXTURE_RESOLUTION.x));
 
 		if (isSolid) {
 			r_drawSolidColumn(
 				closeSectorID,
-				x, aspectRatio*invDistance,
+				screenX, aspectRatio*invDistance, (int)(textureX),
 				fbPTR, resolution, thisLineDef->texture
 			);
 		} else {
 			r_drawPortalColumn(
 				closeSectorID, farSectorID,
-				x, aspectRatio*invDistance,
+				screenX, aspectRatio*invDistance, (int)(textureX),
 				fbPTR, resolution, thisLineDef->texture
 			);
 		}
