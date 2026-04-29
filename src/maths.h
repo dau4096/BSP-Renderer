@@ -15,6 +15,9 @@ static float f_lerp(float a, float b, float t) {
 	return a + (b-a)*t;
 }
 
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+
 
 //////// GENERIC MATHS ////////
 

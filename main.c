@@ -51,8 +51,19 @@ int main(void) {
 		//Failed to find valid keyboard.
 		printf("Failed to find valid keyboard input.\n");
 		io_quit();
+		t_deleteFramebuffer();
 		return -1;
 	}
+
+	int texturesSuccess = r_loadTextures();
+	if (!texturesSuccess) {
+		//Failed to find valid keyboard.
+		printf("Failed to load texture data.\n");
+		io_quit();
+		t_deleteFramebuffer();
+		return -1;
+	}
+
 	r_initCamera();
 	r_createGeometry();
 
@@ -103,6 +114,10 @@ int main(void) {
 			nanosleep(&ts, NULL);
 		}
 		frameNumber++;
+
+	#ifdef SUPPRESS_FRAMEBUFFER_OUTPUT
+		printf("\n");
+	#endif
 	} while (run && !(keyMap[K_QUIT]));
 	printf("\n");
 

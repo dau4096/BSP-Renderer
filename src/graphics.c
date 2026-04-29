@@ -1,4 +1,6 @@
 /* graphics.c */
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -29,13 +31,11 @@ Sector_t sectors[MAX_SECTORS]; //Sectors made of LineDefs.
 
 
 
-//////// DEPTH MAPPING ////////
+//////// COLUMN DATA ////////
 typedef uint8_t Depth_t;
 Depth_t* depthMap; //1D depthmap.
-
-//Vertical ranges allowed to draw in;
-unsigned int* lowYMap;
-unsigned int* topYMap;
+unsigned int* lowYMap; //Lowest pixel of each column allowed to be drawn to
+unsigned int* topYMap; //Highest pixel of each column allowed to be drawn to
 
 
 void r_reallocColumnBuffers(const int width) {
@@ -62,7 +62,77 @@ Depth_t r_mapDepth(float depthF) {
 		fmin(depthF / camera.maxDistance, 1.0f) * 255.0f //Remap to 0-255.
 	);
 }
-//////// DEPTH MAPPING ////////
+
+
+int r_manageColumnValues(unsigned int x, unsigned int* lowYBound, unsigned int* topYBound) { //Returns success.
+	//Check column is writeable
+	if (lowYMap[x] >= topYMap[x]) {return FALSE; /* Column is already full. */}
+
+	//Replace values in the maps.
+	*lowYBound = MAX(*lowYBound, lowYMap[x]);
+	*topYBound = MAX(*topYBound, topYMap[x]);
+
+	return TRUE; //Success.
+}
+//////// COLUMN DATA ////////
+
+
+
+
+//////// TEXTURES ////////
+#define TEXTURE_RESOLUTION ((Vec2i_t){.x=32, .y=32})
+#define MAX_TEXTURES 8
+
+unsigned int numValidTextures;
+RGB_t* textures[MAX_TEXTURES]; //Stores texture data. Each entry is a 32×32 grid of pixel data (1D) organised by columns ([(x * 32) + y])
+
+
+
+int r_loadTexture(const char* path, RGB_t** pixels) { //Returns success
+	int width, height, channels;
+	unsigned char* textureDataSTBI = stbi_load(
+		path,
+		&width, &height,
+		&channels, 3 //Only take RGB back, not A.
+	);
+
+	if (
+		(!textureDataSTBI) || //Failed to load
+		(width != TEXTURE_RESOLUTION.x) || (height != TEXTURE_RESOLUTION.y) //Wrong resolution
+	) {return FALSE; /* Invalid */}
+
+	//Transpose, and convert from [unsigned char] data to (RGB_t)[R, G, B] data.
+	//Pixel data is used in columns so swapping from [y][x] order to [x][y] order is worthwhile.
+	*pixels = malloc(sizeof(RGB_t) * width * height);
+	for (unsigned int i=0u; i<TEXTURE_RESOLUTION.x; i++) {
+		for (unsigned int j=0u; j<TEXTURE_RESOLUTION.y; j++) {
+			unsigned char* pxStart = textureDataSTBI + ((j * TEXTURE_RESOLUTION.x) + i) * 3u;
+			RGB_t* ptr = (*pixels) + (i * TEXTURE_RESOLUTION.y) + j;
+			*ptr = (RGB_t){
+				.r=(uint8_t)(*(pxStart+0)),
+				.g=(uint8_t)(*(pxStart+1)),
+				.b=(uint8_t)(*(pxStart+2))
+			};
+			t_quantise(ptr);
+		}
+	}
+
+	//Cleanup
+	stbi_image_free(textureDataSTBI);
+
+	return TRUE;
+}
+
+
+int r_getColumn(unsigned int ID, const int x, RGB_t** ptr) { //Returns success
+	if (ID >= MAX_TEXTURES) {return FALSE; /* Invalid */}
+	*ptr = textures[ID] + (x * TEXTURE_RESOLUTION.y); //Organised in columns, so iterate over this [TEXTURE_RESOLUTION.y] times for a full column.
+	return TRUE;
+}
+
+//////// TEXTURES ////////
+
+
 
 
 
@@ -82,19 +152,19 @@ int r_getCentreX(const Vec2f_t position, const Vec2i_t resolution) {
 
 
 void r_getLineDefSectorProjections(
-	const Sector_t* thisSector, float invDistance, int* lowYBound, int* topYBound, const Vec2i_t resolution
+	const Sector_t* thisSector, float invDistance, int* lowY, int* topY, const Vec2i_t resolution
 ) {
 	float projectedYFloor = (cameraZ - thisSector->floorHeight) * invDistance;
 	float projectedYCeiling = (cameraZ - thisSector->ceilingHeight) * invDistance;
 
-	*lowYBound = (int)((float)(resolution.y) * (0.5f - projectedYFloor));
-	*topYBound = (int)((float)(resolution.y) * (0.5f - projectedYCeiling));
+	*lowY = (int)((float)(resolution.y) * (0.5f - projectedYFloor));
+	*topY = (int)((float)(resolution.y) * (0.5f - projectedYCeiling));
 }
 
 
 void r_drawSolidColumn(
 	const int sectorID, int x, float invDistance,
-	RGB_t* fbPTR, const Vec2i_t resolution, RGB_t colour
+	RGB_t* fbPTR, const Vec2i_t resolution, unsigned int textureID
 ) {
 	Depth_t mappedDepth = r_mapDepth(1.0f / invDistance);
 	if (depthMap[x] <= mappedDepth) {return; /* Occluded */}
@@ -105,7 +175,7 @@ void r_drawSolidColumn(
 	if (minYBound == maxYBound) {return; /* Column is full */}
 
 	//Draw this wall collumn.
-	int lowYBound, topYBound;
+	int lowYBound, topYBound; //Area this column should span (inside segment)
 	const Sector_t* thisSector = sectors + sectorID;
 	r_getLineDefSectorProjections(
 		thisSector, invDistance, &lowYBound, &topYBound, resolution
@@ -120,6 +190,16 @@ void r_drawSolidColumn(
 	topYMap[x] = 0;
 
 
+
+#ifdef DEBUG_BORDERS
+	//Draw ceiling border.
+	*(fbPTR + x + (resolution.x * yLow)) = RGB_RED;
+
+	//Draw floor border.
+	*(fbPTR + x + (resolution.x * yTop)) = RGB_RED;
+
+#else
+
 	//Draws top-to-bottom vertically.
 	RGB_t* ptr;
 
@@ -132,9 +212,10 @@ void r_drawSolidColumn(
 
 	//Draw wall.
 	ptr = fbPTR + x + (resolution.x * yLow);
+	RGB_t* texPTR;
+	if (!r_getColumn(textureID, x, &texPTR)) {return;}
 	for (int y=yLow; y<yTop; y++) {
-		//Texturing TBA. yLow is low INDEX not low ONSCREEN.
-		*ptr = colour; //Magenta for now.
+		*ptr = *texPTR;
 		ptr += resolution.x;
 	}
 	depthMap[x] = mappedDepth;
@@ -145,13 +226,14 @@ void r_drawSolidColumn(
 		*ptr = thisSector->floorColour;
 		ptr += resolution.x;	
 	}
+#endif
 }
 
 
 void r_drawPortalColumn(
 	const int closeSectorID, const int farSectorID,
 	int x, float invDistance,
-	RGB_t* fbPTR, const Vec2i_t resolution, RGB_t colour
+	RGB_t* fbPTR, const Vec2i_t resolution, unsigned int textureID
 ) {
 	Depth_t mappedDepth = r_mapDepth(1.0f / invDistance);
 	if (depthMap[x] <= mappedDepth) {return; /* Occluded */}
@@ -187,7 +269,41 @@ void r_drawPortalColumn(
 	int yTop = fmax(topYBoundNear, topYBoundFar);
 
 
+
+#ifdef DEBUG_BORDERS
+	//Draw lower border
+	if (lowYBoundNear < lowYBoundFar) {
+		//Draw a connecting wall between them and fill Y fill data.
+		lowYMap[x] = lowYBoundFar;
+		*(fbPTR + x + (resolution.x * lowYBoundFar)) = RGB_MAGENTA;
+		*(fbPTR + x + (resolution.x * lowYBoundNear)) = RGB_BLUE;
+	} else {
+		//Just fill Y fill data.
+		lowYMap[x] = lowYBoundNear;
+		*(fbPTR + x + (resolution.x * lowYBoundNear)) = RGB_MAGENTA;
+		*(fbPTR + x + (resolution.x * lowYBoundFar)) = RGB_BLUE;
+	}
+
+	//Draw upper border.
+	if (topYBoundNear > topYBoundFar) {
+		//Draw a connecting wall between them and fill Y fill data.
+		topYMap[x] = topYBoundFar;
+		*(fbPTR + x + (resolution.x * topYBoundFar)) = RGB_MAGENTA;
+		*(fbPTR + x + (resolution.x * topYBoundNear)) = RGB_BLUE;
+	} else {
+		//Just fill Y fill data.
+		topYMap[x] = topYBoundNear;
+		*(fbPTR + x + (resolution.x * topYBoundNear)) = RGB_MAGENTA;
+		*(fbPTR + x + (resolution.x * topYBoundFar)) = RGB_BLUE;
+	}
+
+
+#else
+
+	//Draws top-to-bottom vertically.
 	RGB_t* ptr;
+
+
 	//Draw the ceiling
 	ptr = fbPTR + x + (resolution.x * minYBound);
 	for (int y=minYBound; y<yLow; y++) {
@@ -196,12 +312,14 @@ void r_drawPortalColumn(
 	}
 
 	//Draw the lower (Y value, higher onscreen) section of the portal
+	RGB_t* texPTR;
+	if (!r_getColumn(textureID, x, &texPTR)) {return;}
 	if (lowYBoundNear < lowYBoundFar) {
 		//Draw a connecting wall between them and fill Y fill data.
 		lowYMap[x] = lowYBoundFar;
 		ptr = fbPTR + x + (resolution.x * lowYBoundNear);
 		for (int y=lowYBoundNear; y<lowYBoundFar; y++) {
-			*ptr = colour;
+			*ptr = *texPTR;
 			ptr += resolution.x;
 		}
 	} else {
@@ -221,7 +339,7 @@ void r_drawPortalColumn(
 		topYMap[x] = topYBoundFar;
 		ptr = fbPTR + x + (resolution.x * topYBoundFar);
 		for (int y=topYBoundFar; y<topYBoundNear; y++) {
-			*ptr = colour;
+			*ptr = *texPTR;
 			ptr += resolution.x;
 		}
 	} else {
@@ -241,24 +359,23 @@ void r_drawPortalColumn(
 		*ptr = nearSector->floorColour;
 		ptr += resolution.x;
 	}
+#endif
 }
 
 
 
-void r_drawLineDef(
-	const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t* fbPTR
-) {
-	//Interpolate from start-end along the LineDef.
+
+void r_drawLineDef(const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t* fbPTR) {
+	//Interpolate from start-end along the Segment.
 	Vec2f_t start = vertices[thisLineDef->vStart];
 	Vec2f_t end = vertices[thisLineDef->vEnd];
-
 
 	float dStart = v2f_dot(camera.forward, v2f_sub(start, camera.position));
 	float dEnd = v2f_dot(camera.forward, v2f_sub(end, camera.position));
     Vec2f_t dir = v2f_sub(end, start);
 	Vec2f_t normal = (Vec2f_t){.x=-dir.y, .y=dir.x};
 
-	if ((dStart < 0.0f) && (dEnd < 0.0f)) return;
+	if ((dStart < 0.0f) && (dEnd < 0.0f)) {return;}
 
 	//If one point is behind, clip it.
 	if ((dStart < 0.0f) || (dEnd < 0.0f)) {
@@ -297,6 +414,7 @@ void r_drawLineDef(
 	if ((rightMostClamp < 0) || (leftMostClamp >= resolution.x)) {return; /* Offscreen horizontally */}
 
 
+
 	int closeSectorID, farSectorID, isSolid;
 	if (thisLineDef->backSector == -1) {closeSectorID = thisLineDef->frontSector; isSolid=TRUE;}
 	else if (thisLineDef->frontSector == -1) {closeSectorID = thisLineDef->backSector; isSolid=TRUE;}
@@ -321,25 +439,19 @@ void r_drawLineDef(
 	for (int x=leftMostClamp; x<rightMostClamp; x++) {
 		float t = (float)(x - leftMost) / (float)(range);
 		float invDistance = f_lerp(lInvDepth, rInvDepth, t);
+		float depthF = 1.0f / invDistance;
 
-		float a = (v2f_dot(v2f_normalise(normal), camera.forward) * 0.5f) + 0.5f;
-		RGB_t colour = (RGB_t) {
-			.r=thisLineDef->colour.r*a,
-			.g=thisLineDef->colour.g*a,
-			.b=thisLineDef->colour.b*a
-		};
-		t_quantise(&colour);
 		if (isSolid) {
 			r_drawSolidColumn(
 				closeSectorID,
 				x, aspectRatio*invDistance,
-				fbPTR, resolution, colour
+				fbPTR, resolution, thisLineDef->texture
 			);
 		} else {
 			r_drawPortalColumn(
 				closeSectorID, farSectorID,
 				x, aspectRatio*invDistance,
-				fbPTR, resolution, colour
+				fbPTR, resolution, thisLineDef->texture
 			);
 		}
 	}
@@ -347,17 +459,81 @@ void r_drawLineDef(
 
 
 
-void r_drawFrame(const Vec2i_t resolution) {
-	RGB_t* fbPTR = t_getFramebufferPTR();
-	r_clearColumnBuffers(resolution); //Reset depth data for this frame.
+float r_getLineDefDistance(const LineDef_t* thisLineDef) {
+	//Get distance from camera.
+	Vec2f_t start = vertices[thisLineDef->vStart];
+	Vec2f_t end = vertices[thisLineDef->vEnd];
+
+	Vec2f_t delta = v2f_sub(end, start);
+	float lengthSQ = v2f_lenSQ(delta);
+	Vec2f_t direction = v2f_div(delta, sqrtf(lengthSQ)); //Normalise
+	float projSQ = v2f_dot(
+		v2f_sub(camera.position, start), direction
+	);
+	float proj = sqrtf(MAX(0.0f, MIN(projSQ, lengthSQ)));
+
+	Vec2f_t closestPoint = v2f_add(
+		start, v2f_mul(direction, proj)
+	);
+
+	return v2f_lenSQ(v2f_sub(camera.position, closestPoint));
+}
+
+
+int r_compareSorts(const void* a, const void* b) {
+	float dA = ((const LineDefSort_t*)a)->distance;
+	float dB = ((const LineDefSort_t*)b)->distance;
+
+	if (dA < dB) {return -1;}
+	if (dA > dB) {return  1;}
+	return 0; //EQU.
+}
+
+
+void r_sortLineDefs(
+	LineDef_t** result, unsigned int* numValidLineDefs
+) {
+	//Find LDs nearest to furthest.
+	LineDefSort_t sorts[MAX_LINEDEFS];
+	unsigned int numSorts = 0u;
 
 	for (unsigned int ldIndex=0u; ldIndex<MAX_LINEDEFS; ldIndex++) {
-		const LineDef_t* thisLineDef = lineDefs+ldIndex;
+		LineDef_t* thisLineDef = lineDefs + ldIndex;
 		if (!(thisLineDef->isValid)) {continue;}
+		(*numValidLineDefs)++;
+		sorts[numSorts++] = (LineDefSort_t){
+			.distance=r_getLineDefDistance(thisLineDef),
+			.lineDef=thisLineDef
+		};
+	}
+
+	qsort(sorts, numSorts, sizeof(LineDefSort_t), r_compareSorts);
+
+	for (unsigned int sortIndex=0u; sortIndex<numSorts; sortIndex++) {result[sortIndex] = sorts[sortIndex].lineDef;}
+}
+
+
+void r_drawFrame(const Vec2i_t resolution) {
+	RGB_t* fbPTR = t_getFramebufferPTR();
+	r_clearColumnBuffers(resolution); //Reset depth data & column bottom/top data for this frame.
+
+
+	//Sort near-to-far.
+	LineDef_t* sortedLineDefs[MAX_LINEDEFS];
+	unsigned int numValidLineDefs = 0u;
+	r_sortLineDefs(sortedLineDefs, &numValidLineDefs);
+
+
+	for (unsigned int ldIndex=0u; ldIndex<numValidLineDefs; ldIndex++) {
+		LineDef_t* thisLineDef = sortedLineDefs[ldIndex];
 		r_drawLineDef(thisLineDef, resolution, fbPTR);
 	}
 }
 //////// DRAWING ////////
+
+
+
+
 
 
 
@@ -369,6 +545,27 @@ void r_initCamera(void) {
 		.maxDistance=32.0f,
 		.forward=(Vec2f_t){.x=0.0f, .y=1.0f}
 	};
+}
+
+
+int r_loadTextures(void) {
+	const unsigned char* texturePaths[] = {
+		"textures/fallback.png"
+	};
+	unsigned int numTexturePaths = sizeof(texturePaths) / sizeof(texturePaths[0]);
+
+	numValidTextures = 0u;
+	for (unsigned int i=0u; i<numTexturePaths; i++) {
+		const unsigned char* path = texturePaths[i];
+
+		RGB_t* pixelData;
+		if (!r_loadTexture(path, &pixelData)) {printf("Failed to load [%s]\n", path); return FALSE; /* Failed to load texture */}
+
+		textures[numValidTextures++] = pixelData;
+		printf("Loaded [%s] successfully.\n", path);
+	}
+
+	return TRUE; //Success
 }
 
 
@@ -388,70 +585,70 @@ void r_createGeometry(void) {
 	lineDefs[0] = (LineDef_t){
 		.vStart=0, .vEnd=1,
 		.frontSector=0, .backSector=-1,
-		.colour=RGB_RED,
+		.texture=0u,
 		.isValid=TRUE
 	};
 
 	lineDefs[1] = (LineDef_t){
 		.vStart=1, .vEnd=2,
 		.frontSector=2, .backSector=0,
-		.colour=RGB_CYAN,
+		.texture=0u,
 		.isValid=TRUE
 	};
 
 	lineDefs[2] = (LineDef_t){
 		.vStart=2, .vEnd=3,
 		.frontSector=0, .backSector=-1,
-		.colour=RGB_RED,
+		.texture=0u,
 		.isValid=TRUE
 	};
 
 	lineDefs[3] = (LineDef_t){
 		.vStart=3, .vEnd=4,
 		.frontSector=1, .backSector=0,
-		.colour=RGB_YELLOW,
+		.texture=0u,
 		.isValid=TRUE
 	};
 
 	lineDefs[4] = (LineDef_t){
 		.vStart=4, .vEnd=0,
 		.frontSector=0, .backSector=-1,
-		.colour=RGB_RED,
+		.texture=0u,
 		.isValid=TRUE
 	};
 
 	lineDefs[5] = (LineDef_t){
 		.vStart=3, .vEnd=5,
 		.frontSector=1, .backSector=-1,
-		.colour=RGB_BLUE,
+		.texture=0u,
 		.isValid=TRUE
 	};
 
 	lineDefs[6] = (LineDef_t){
 		.vStart=5, .vEnd=6,
 		.frontSector=1, .backSector=-1,
-		.colour=RGB_BLUE,
+		.texture=0u,
 		.isValid=TRUE
 	};
 
 	lineDefs[7] = (LineDef_t){
 		.vStart=6, .vEnd=4,
 		.frontSector=1, .backSector=-1,
-		.colour=RGB_BLUE,
+		.texture=0u,
 		.isValid=TRUE
 	};
 
 	lineDefs[8] = (LineDef_t){
 		.vStart=1, .vEnd=7,
 		.frontSector=2, .backSector=-1,
-		.colour=RGB_YELLOW,
+		.texture=0u,
 		.isValid=TRUE
 	};
 
 	lineDefs[9] = (LineDef_t){
 		.vStart=7, .vEnd=2,
 		.frontSector=2, .backSector=-1,
-		.colour=RGB_YELLOW,
+		.texture=0u,
 		.isValid=TRUE
 	};
 
@@ -466,7 +663,7 @@ void r_createGeometry(void) {
 	ldIndicesSector0[4] = 4;
 	sectors[0] = (Sector_t){
 		.floorHeight=-2.0f, .floorColour=RGB_RED,
-		.ceilingHeight=2.0f, .ceilingColour=RGB_WHITE,
+		.ceilingHeight=2.0f, .ceilingColour=RGB_MAGENTA,
 		.lineDefs=ldIndicesSector0, .numLineDefs=5
 	};
 
@@ -480,7 +677,7 @@ void r_createGeometry(void) {
 	ldIndicesSector1[3] = 7;
 	sectors[1] = (Sector_t){
 		.floorHeight=-3.0f, .floorColour=RGB_BLUE,
-		.ceilingHeight=3.0f, .ceilingColour=RGB_WHITE,
+		.ceilingHeight=3.0f, .ceilingColour=RGB_CYAN,
 		.lineDefs=ldIndicesSector1, .numLineDefs=4
 	};
 
@@ -493,10 +690,11 @@ void r_createGeometry(void) {
 	ldIndicesSector2[2] = 9;
 	sectors[2] = (Sector_t){
 		.floorHeight=-0.5f, .floorColour=RGB_GREEN,
-		.ceilingHeight=0.5f, .ceilingColour=RGB_WHITE,
+		.ceilingHeight=0.5f, .ceilingColour=RGB_YELLOW,
 		.lineDefs=ldIndicesSector2, .numLineDefs=3
 	};
 }
+
 //////// INITIALISATION ////////
 
 
