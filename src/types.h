@@ -35,41 +35,6 @@ typedef struct {
 
 
 
-//BSP
-typedef struct {
-	Vec2f_t vStart;
-	Vec2f_t vEnd;
-	unsigned int lineDefIndex;
-} Segment_t;
-
-typedef struct {
-	Vec2f_t position; //Line origin
-	Vec2f_t forward; //Direction in which positions are considered "forward"
-	//Dot product of pos delta & forward being positive means that pos is "forward".
-} Split_t;
-
-typedef struct {
-	Vec2i_t p;
-	Vec2i_t f;
-} SplitKey_t;
-
-typedef struct {
-	float score;
-	Split_t split;
-} Candidate_t;
-
-typedef struct _BSPnode {
-	Split_t split; //Plane it was split along
-	Segment_t* segments;
-	unsigned int numSegments;
-	int isLeaf; //Is it a leaf node?
-	int isValid; //Was it created correctly?
-	struct _BSPnode* forwardNode;
-	struct _BSPnode* behindNode;
-} BSPnode_t;
-
-
-
 //Geometry
 typedef struct {
 	int valid;

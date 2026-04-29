@@ -52,19 +52,10 @@ int main(void) {
 		printf("Failed to find valid keyboard input.\n");
 		io_quit();
 		t_deleteFramebuffer();
-		r_freeBSPTree();
 		return -1;
 	}
 	r_initCamera();
-	int BSPsuccess = r_createGeometry();
-	if (!BSPsuccess) {
-		//Failed to create the BSP tree.
-		printf("Failed to create the BSP tree.\n");
-		io_quit();
-		t_deleteFramebuffer();
-		r_freeBSPTree();
-		return -1;
-	}
+	r_createGeometry();
 
 
 	double start;
@@ -122,7 +113,6 @@ int main(void) {
 
 	t_deleteFramebuffer();
 	io_quit();
-	r_freeBSPTree();
 
 	return 1;
 }

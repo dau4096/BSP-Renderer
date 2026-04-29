@@ -24,8 +24,6 @@ Camera_t camera; //The view
 Vec2f_t vertices[MAX_VERTICES]; //2D positions.
 LineDef_t lineDefs[MAX_LINEDEFS]; //LineDefs connecting vertices.
 Sector_t sectors[MAX_SECTORS]; //Sectors made of LineDefs.
-
-BSPnode_t BSPtreeRoot; //Root of the BSP tree.
 //////// DATA ////////
 
 
@@ -78,6 +76,8 @@ int r_manageColumnValues(unsigned int x, unsigned int* lowYBound, unsigned int* 
 
 
 
+
+
 //////// DRAWING ////////
 int r_getCentreX(const Vec2f_t position, const Vec2i_t resolution) {
 	Vec2f_t direction = v2f_sub(position, camera.position);
@@ -117,49 +117,57 @@ void r_drawSolidColumn(
 	if (minYBound == maxYBound) {return; /* Column is full */}
 
 	//Draw this wall collumn.
-	int lowY, topY; //Area this column should span (inside segment)
+	int lowYBound, topYBound; //Area this column should span (inside segment)
 	const Sector_t* thisSector = sectors + sectorID;
 	r_getLineDefSectorProjections(
-		thisSector, invDistance, &lowY, &topY, resolution
+		thisSector, invDistance, &lowYBound, &topYBound, resolution
 	);
+	if ((topYBound<minYBound) || (lowYBound>=maxYBound)) {return; /* Completely offscreen vertically. */}
 
-	int lowYBound=lowYMap[x], topYBound=topYMap[x]; //Extents allowed to fill.
-	int success = r_manageColumnValues(x, &lowY, &topY);
-	if (!success) {return; /* Column is full. */}
-
+	int yLow = fmax(lowYBound, minYBound);
+	int yTop = fmin(topYBound, maxYBound);
 
 	//Column is taken, column was solid.
 	lowYMap[x] = 0;
 	topYMap[x] = 0;
 
 
+
+#ifdef DEBUG_BORDERS
+	//Draw ceiling border.
+	*(fbPTR + x + (resolution.x * yLow)) = RGB_RED;
+
+	//Draw floor border.
+	*(fbPTR + x + (resolution.x * yTop)) = RGB_RED;
+
+#else
+
 	//Draws top-to-bottom vertically.
 	RGB_t* ptr;
-	lowY = fmax(lowY, 0);
-	topY = fmin(topY, resolution.y);
 
 	//Draw ceiling.
-	ptr = fbPTR + x + (resolution.x * lowYBound);
-	for (int y=lowYBound; y<lowY; y++) {
+	ptr = fbPTR + x + (resolution.x * minYBound);
+	for (int y=minYBound; y<yLow; y++) {
 		*ptr = thisSector->ceilingColour;
-		ptr += resolution.x;
+		ptr += resolution.x;	
 	}
 
 	//Draw wall.
-	ptr = fbPTR + x + (resolution.x * lowY);
-	for (int y=lowY; y<topY; y++) {
-		//Texturing TBA. lowY is low INDEX not low ONSCREEN.
+	ptr = fbPTR + x + (resolution.x * yLow);
+	for (int y=yLow; y<yTop; y++) {
+		//Texturing TBA. yLow is low INDEX not low ONSCREEN.
 		*ptr = colour; //Magenta for now.
 		ptr += resolution.x;
 	}
 	depthMap[x] = mappedDepth;
 
 	//Draw floor.
-	ptr = fbPTR + x + (resolution.x * topY);
-	for (int y=topY; y<topYBound; y++) {
+	ptr = fbPTR + x + (resolution.x * yTop);
+	for (int y=yTop; y<maxYBound; y++) {
 		*ptr = thisSector->floorColour;
 		ptr += resolution.x;	
 	}
+#endif
 }
 
 
@@ -202,7 +210,41 @@ void r_drawPortalColumn(
 	int yTop = fmax(topYBoundNear, topYBoundFar);
 
 
+
+#ifdef DEBUG_BORDERS
+	//Draw lower border
+	if (lowYBoundNear < lowYBoundFar) {
+		//Draw a connecting wall between them and fill Y fill data.
+		lowYMap[x] = lowYBoundFar;
+		*(fbPTR + x + (resolution.x * lowYBoundFar)) = RGB_MAGENTA;
+		*(fbPTR + x + (resolution.x * lowYBoundNear)) = RGB_BLUE;
+	} else {
+		//Just fill Y fill data.
+		lowYMap[x] = lowYBoundNear;
+		*(fbPTR + x + (resolution.x * lowYBoundNear)) = RGB_MAGENTA;
+		*(fbPTR + x + (resolution.x * lowYBoundFar)) = RGB_BLUE;
+	}
+
+	//Draw upper border.
+	if (topYBoundNear > topYBoundFar) {
+		//Draw a connecting wall between them and fill Y fill data.
+		topYMap[x] = topYBoundFar;
+		*(fbPTR + x + (resolution.x * topYBoundFar)) = RGB_MAGENTA;
+		*(fbPTR + x + (resolution.x * topYBoundNear)) = RGB_BLUE;
+	} else {
+		//Just fill Y fill data.
+		topYMap[x] = topYBoundNear;
+		*(fbPTR + x + (resolution.x * topYBoundNear)) = RGB_MAGENTA;
+		*(fbPTR + x + (resolution.x * topYBoundFar)) = RGB_BLUE;
+	}
+
+
+#else
+
+	//Draws top-to-bottom vertically.
 	RGB_t* ptr;
+
+
 	//Draw the ceiling
 	ptr = fbPTR + x + (resolution.x * minYBound);
 	for (int y=minYBound; y<yLow; y++) {
@@ -256,15 +298,16 @@ void r_drawPortalColumn(
 		*ptr = nearSector->floorColour;
 		ptr += resolution.x;
 	}
+#endif
 }
 
 
 
 
-void r_drawSegment(const Segment_t thisSegment, const Vec2i_t resolution, RGB_t* fbPTR) {
+void r_drawLineDef(const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t* fbPTR) {
 	//Interpolate from start-end along the Segment.
-	Vec2f_t start = thisSegment.vStart;
-	Vec2f_t end = thisSegment.vEnd;
+	Vec2f_t start = vertices[thisLineDef->vStart];
+	Vec2f_t end = vertices[thisLineDef->vEnd];
 
 	float dStart = v2f_dot(camera.forward, v2f_sub(start, camera.position));
 	float dEnd = v2f_dot(camera.forward, v2f_sub(end, camera.position));
@@ -310,7 +353,7 @@ void r_drawSegment(const Segment_t thisSegment, const Vec2i_t resolution, RGB_t*
 	if ((rightMostClamp < 0) || (leftMostClamp >= resolution.x)) {return; /* Offscreen horizontally */}
 
 
-	LineDef_t* thisLineDef = lineDefs + thisSegment.lineDefIndex;
+
 	int closeSectorID, farSectorID, isSolid;
 	if (thisLineDef->backSector == -1) {closeSectorID = thisLineDef->frontSector; isSolid=TRUE;}
 	else if (thisLineDef->frontSector == -1) {closeSectorID = thisLineDef->backSector; isSolid=TRUE;}
@@ -331,6 +374,7 @@ void r_drawSegment(const Segment_t thisSegment, const Vec2i_t resolution, RGB_t*
 
 
 	//Draw, interpolating.
+	float aspectRatio = (float)(resolution.x) / (float)(resolution.y);
 	for (int x=leftMostClamp; x<rightMostClamp; x++) {
 		float t = (float)(x - leftMost) / (float)(range);
 		float invDistance = f_lerp(lInvDepth, rInvDepth, t);
@@ -368,11 +412,10 @@ void r_drawFrame(const Vec2i_t resolution) {
 	RGB_t* fbPTR = t_getFramebufferPTR();
 	r_clearColumnBuffers(resolution); //Reset depth data & column bottom/top data for this frame.
 
-	bsp_walk(
-		&BSPtreeRoot, camera.position, //BSP parameters
-		resolution, fbPTR, //Function parameters
-		r_drawSegment //Function
-	);
+	for (unsigned int ldIndex=0u; ldIndex<MAX_LINEDEFS; ldIndex++) {
+		LineDef_t* thisLineDef = lineDefs + ldIndex;
+		r_drawLineDef(thisLineDef, resolution, fbPTR);
+	}
 }
 //////// DRAWING ////////
 
@@ -394,7 +437,7 @@ void r_initCamera(void) {
 
 
 
-int r_createGeometry(void) {
+void r_createGeometry(void) {
 	vertices[0] = (Vec2f_t){.x=-10.0f, .y= 10.0f};
 	vertices[1] = (Vec2f_t){.x= 10.0f, .y= 10.0f};
 	vertices[2] = (Vec2f_t){.x= 15.0f, .y=-10.0f};
@@ -517,21 +560,8 @@ int r_createGeometry(void) {
 		.ceilingHeight=0.5f, .ceilingColour=RGB_WHITE,
 		.lineDefs=ldIndicesSector2, .numLineDefs=3
 	};
-
-
-	int success;
-	BSPtreeRoot = bsp_build(
-		vertices, MAX_VERTICES,
-		lineDefs, MAX_LINEDEFS,
-		&success
-	);
-	return success;
 }
 
-
-void r_freeBSPTree(void) {
-	bsp_free(&BSPtreeRoot);
-}
 //////// INITIALISATION ////////
 
 

@@ -24,8 +24,7 @@ void r_drawFrame(const Vec2i_t resolution);
 
 //////// INITIALISATION ////////
 void r_initCamera(void);
-int r_createGeometry(void);
-void r_freeBSPTree(void);
+void r_createGeometry(void);
 //////// INITIALISATION ////////
 
 
