@@ -53,6 +53,11 @@ typedef struct {
 } LineDef_t;
 
 typedef struct {
+	float distance;
+	LineDef_t* lineDef;
+} LineDefSort_t;
+
+typedef struct {
 	float floorHeight; RGB_t floorColour; //Floor data
 	float ceilingHeight; RGB_t ceilingColour; //Ceiling data
 	unsigned int* lineDefs;    //Array of IDs to LineDef_t[] array (Like 3D model indices)

@@ -408,12 +408,73 @@ void r_drawLineDef(const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t
 
 
 
+float r_getLineDefDistance(const LineDef_t* thisLineDef) {
+	//Get distance from camera.
+	Vec2f_t start = vertices[thisLineDef->vStart];
+	Vec2f_t end = vertices[thisLineDef->vEnd];
+
+	Vec2f_t delta = v2f_sub(end, start);
+	float lengthSQ = v2f_lenSQ(delta);
+	Vec2f_t direction = v2f_div(delta, sqrtf(lengthSQ)); //Normalise
+	float projSQ = v2f_dot(
+		v2f_sub(camera.position, start), direction
+	);
+	float proj = sqrtf(MAX(0.0f, MIN(projSQ, lengthSQ)));
+
+	Vec2f_t closestPoint = v2f_add(
+		start, v2f_mul(direction, proj)
+	);
+
+	return v2f_lenSQ(v2f_sub(camera.position, closestPoint));
+}
+
+
+int r_compareSorts(const void* a, const void* b) {
+	float dA = ((const LineDefSort_t*)a)->distance;
+	float dB = ((const LineDefSort_t*)b)->distance;
+
+	if (dA < dB) {return -1;}
+	if (dA > dB) {return  1;}
+	return 0; //EQU.
+}
+
+
+void r_sortLineDefs(
+	LineDef_t** result, unsigned int* numValidLineDefs
+) {
+	//Find LDs nearest to furthest.
+	LineDefSort_t sorts[MAX_LINEDEFS];
+	unsigned int numSorts = 0u;
+
+	for (unsigned int ldIndex=0u; ldIndex<MAX_LINEDEFS; ldIndex++) {
+		LineDef_t* thisLineDef = lineDefs + ldIndex;
+		if (!(thisLineDef->isValid)) {continue;}
+		(*numValidLineDefs)++;
+		sorts[numSorts++] = (LineDefSort_t){
+			.distance=r_getLineDefDistance(thisLineDef),
+			.lineDef=thisLineDef
+		};
+	}
+
+	qsort(sorts, numSorts, sizeof(LineDefSort_t), r_compareSorts);
+
+	for (unsigned int sortIndex=0u; sortIndex<numSorts; sortIndex++) {result[sortIndex] = sorts[sortIndex].lineDef;}
+}
+
+
 void r_drawFrame(const Vec2i_t resolution) {
 	RGB_t* fbPTR = t_getFramebufferPTR();
 	r_clearColumnBuffers(resolution); //Reset depth data & column bottom/top data for this frame.
 
-	for (unsigned int ldIndex=0u; ldIndex<MAX_LINEDEFS; ldIndex++) {
-		LineDef_t* thisLineDef = lineDefs + ldIndex;
+
+	//Sort near-to-far.
+	LineDef_t* sortedLineDefs[MAX_LINEDEFS];
+	unsigned int numValidLineDefs = 0u;
+	r_sortLineDefs(sortedLineDefs, &numValidLineDefs);
+
+
+	for (unsigned int ldIndex=0u; ldIndex<numValidLineDefs; ldIndex++) {
+		LineDef_t* thisLineDef = sortedLineDefs[ldIndex];
 		r_drawLineDef(thisLineDef, resolution, fbPTR);
 	}
 }
