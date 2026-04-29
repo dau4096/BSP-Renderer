@@ -135,4 +135,43 @@ static Vec2f_t v2f_normalise(const Vec2f_t a) {
 
 
 
+
+//////// COLOUR MATHS ////////
+
+static RGB_t rgb_add(const RGB_t a, const RGB_t b) {
+	return (RGB_t){
+		.r=a.r+b.r, .g=a.g+b.g, .b=a.b+b.b
+	};
+}
+
+static RGB_t rgb_sub(const RGB_t a, const RGB_t b) {
+	return (RGB_t){
+		.r=a.r-b.r, .g=a.g-b.g, .b=a.b-b.b
+	};
+}
+
+static RGB_t rgb_fmul(const RGB_t a, float s) {
+	return (RGB_t){
+		.r=(uint8_t)(s * (float)(a.r)),
+		.g=(uint8_t)(s * (float)(a.g)),
+		.b=(uint8_t)(s * (float)(a.b))
+	};
+}
+
+static RGB_t rgb_imul(const RGB_t a, int s) {
+	return rgb_fmul(a, (float)(s) / 255.0f);	
+}
+
+static void rgb_quantise(RGB_t* colour) {
+#ifdef COLOUR_QUANTISATION //Only modifies if necessary.
+	colour->r = (colour->r >> 4) << 4;
+	colour->g = (colour->g >> 4) << 4;
+	colour->b = (colour->b >> 4) << 4;
+#endif
+}
+
+//////// COLOUR MATHS ////////
+
+
+
 #endif

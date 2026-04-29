@@ -68,7 +68,7 @@ typedef struct {
 
 //Other
 typedef struct {
-	Vec2f_t position;
+	Vec2f_t position; float Z; //Position, 2D with seperate height (z).
 	Vec2f_t forward;
 	float yaw; //Yaw in radians
 	float FOV; //FOV in radians

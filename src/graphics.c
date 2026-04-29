@@ -14,7 +14,6 @@
 
 //////// DATA ////////
 //Temporary, while camera is in 2D.
-#define cameraZ 0.0f
 Camera_t camera; //The view
 
 
@@ -113,7 +112,7 @@ int r_loadTexture(const char* path, RGB_t** pixels) { //Returns success
 				.g=(uint8_t)(*(pxStart+1)),
 				.b=(uint8_t)(*(pxStart+2))
 			};
-			t_quantise(ptr);
+			rgb_quantise(ptr);
 		}
 	}
 
@@ -154,8 +153,8 @@ int r_getCentreX(const Vec2f_t position, const Vec2i_t resolution) {
 void r_getLineDefSectorProjections(
 	const Sector_t* thisSector, float invDistance, int* lowY, int* topY, const Vec2i_t resolution
 ) {
-	float projectedYFloor = (cameraZ - thisSector->floorHeight) * invDistance;
-	float projectedYCeiling = (cameraZ - thisSector->ceilingHeight) * invDistance;
+	float projectedYFloor = -(camera.Z + thisSector->floorHeight) * invDistance;
+	float projectedYCeiling = -(camera.Z + thisSector->ceilingHeight) * invDistance;
 
 	*lowY = (int)((float)(resolution.y) * (0.5f - projectedYFloor));
 	*topY = (int)((float)(resolution.y) * (0.5f - projectedYCeiling));
@@ -556,7 +555,7 @@ void r_initCamera(void) {
 
 int r_loadTextures(void) {
 	const unsigned char* texturePaths[] = {
-		"textures/fallback.png"
+		"textures/uv.png", "textures/fallback.png"
 	};
 	unsigned int numTexturePaths = sizeof(texturePaths) / sizeof(texturePaths[0]);
 
