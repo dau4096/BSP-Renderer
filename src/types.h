@@ -43,13 +43,13 @@ typedef struct {
 } Buffer_t;
 
 typedef struct {
-	unsigned int vStart; //Start vertex ID
-	unsigned int vEnd;  //End vertex ID
-	int frontSector;   //Sector ID this LineDef_t belongs to
-	int backSector;   //-1 if solid wall, else index of neighbouring sector.
-	RGB_t colour;    //Colour to draw.
-					//
-	int isValid;   //Was it created correctly?
+	unsigned int vStart;      //Start vertex ID
+	unsigned int vEnd;       //End vertex ID
+	int frontSector;        //Sector ID this LineDef_t belongs to
+	int backSector;        //-1 if solid wall, else index of neighbouring sector.
+	unsigned int texture; //Texture to draw.
+						 //
+	int isValid;        //Was it created correctly?
 } LineDef_t;
 
 typedef struct {

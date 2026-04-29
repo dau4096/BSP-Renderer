@@ -1,4 +1,6 @@
 /* graphics.c */
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -77,6 +79,62 @@ int r_manageColumnValues(unsigned int x, unsigned int* lowYBound, unsigned int* 
 
 
 
+//////// TEXTURES ////////
+#define TEXTURE_RESOLUTION ((Vec2i_t){.x=32, .y=32})
+#define MAX_TEXTURES 8
+
+unsigned int numValidTextures;
+RGB_t* textures[MAX_TEXTURES]; //Stores texture data. Each entry is a 32×32 grid of pixel data (1D) organised by columns ([(x * 32) + y])
+
+
+
+int r_loadTexture(const char* path, RGB_t** pixels) { //Returns success
+	int width, height, channels;
+	unsigned char* textureDataSTBI = stbi_load(
+		path,
+		&width, &height,
+		&channels, 3 //Only take RGB back, not A.
+	);
+
+	if (
+		(!textureDataSTBI) || //Failed to load
+		(width != TEXTURE_RESOLUTION.x) || (height != TEXTURE_RESOLUTION.y) //Wrong resolution
+	) {return FALSE; /* Invalid */}
+
+	//Transpose, and convert from [unsigned char] data to (RGB_t)[R, G, B] data.
+	//Pixel data is used in columns so swapping from [y][x] order to [x][y] order is worthwhile.
+	*pixels = malloc(sizeof(RGB_t) * width * height);
+	for (unsigned int i=0u; i<TEXTURE_RESOLUTION.x; i++) {
+		for (unsigned int j=0u; j<TEXTURE_RESOLUTION.y; j++) {
+			unsigned char* pxStart = textureDataSTBI + ((j * TEXTURE_RESOLUTION.x) + i) * 3u;
+			RGB_t* ptr = (*pixels) + (i * TEXTURE_RESOLUTION.y) + j;
+			*ptr = (RGB_t){
+				.r=(uint8_t)(*(pxStart+0)),
+				.g=(uint8_t)(*(pxStart+1)),
+				.b=(uint8_t)(*(pxStart+2))
+			};
+			t_quantise(ptr);
+		}
+	}
+
+	//Cleanup
+	stbi_image_free(textureDataSTBI);
+
+	return TRUE;
+}
+
+
+int r_getColumn(unsigned int ID, const int x, RGB_t** ptr) { //Returns success
+	if (ID >= MAX_TEXTURES) {return FALSE; /* Invalid */}
+	*ptr = textures[ID] + (x * TEXTURE_RESOLUTION.y); //Organised in columns, so iterate over this [TEXTURE_RESOLUTION.y] times for a full column.
+	return TRUE;
+}
+
+//////// TEXTURES ////////
+
+
+
+
 
 //////// DRAWING ////////
 int r_getCentreX(const Vec2f_t position, const Vec2i_t resolution) {
@@ -106,7 +164,7 @@ void r_getLineDefSectorProjections(
 
 void r_drawSolidColumn(
 	const int sectorID, int x, float invDistance,
-	RGB_t* fbPTR, const Vec2i_t resolution, RGB_t colour
+	RGB_t* fbPTR, const Vec2i_t resolution, unsigned int textureID
 ) {
 	Depth_t mappedDepth = r_mapDepth(1.0f / invDistance);
 	if (depthMap[x] <= mappedDepth) {return; /* Occluded */}
@@ -154,9 +212,10 @@ void r_drawSolidColumn(
 
 	//Draw wall.
 	ptr = fbPTR + x + (resolution.x * yLow);
+	RGB_t* texPTR;
+	if (!r_getColumn(textureID, x, &texPTR)) {return;}
 	for (int y=yLow; y<yTop; y++) {
-		//Texturing TBA. yLow is low INDEX not low ONSCREEN.
-		*ptr = colour; //Magenta for now.
+		*ptr = *texPTR;
 		ptr += resolution.x;
 	}
 	depthMap[x] = mappedDepth;
@@ -174,7 +233,7 @@ void r_drawSolidColumn(
 void r_drawPortalColumn(
 	const int closeSectorID, const int farSectorID,
 	int x, float invDistance,
-	RGB_t* fbPTR, const Vec2i_t resolution, RGB_t colour
+	RGB_t* fbPTR, const Vec2i_t resolution, unsigned int textureID
 ) {
 	Depth_t mappedDepth = r_mapDepth(1.0f / invDistance);
 	if (depthMap[x] <= mappedDepth) {return; /* Occluded */}
@@ -253,12 +312,14 @@ void r_drawPortalColumn(
 	}
 
 	//Draw the lower (Y value, higher onscreen) section of the portal
+	RGB_t* texPTR;
+	if (!r_getColumn(textureID, x, &texPTR)) {return;}
 	if (lowYBoundNear < lowYBoundFar) {
 		//Draw a connecting wall between them and fill Y fill data.
 		lowYMap[x] = lowYBoundFar;
 		ptr = fbPTR + x + (resolution.x * lowYBoundNear);
 		for (int y=lowYBoundNear; y<lowYBoundFar; y++) {
-			*ptr = colour;
+			*ptr = *texPTR;
 			ptr += resolution.x;
 		}
 	} else {
@@ -278,7 +339,7 @@ void r_drawPortalColumn(
 		topYMap[x] = topYBoundFar;
 		ptr = fbPTR + x + (resolution.x * topYBoundFar);
 		for (int y=topYBoundFar; y<topYBoundNear; y++) {
-			*ptr = colour;
+			*ptr = *texPTR;
 			ptr += resolution.x;
 		}
 	} else {
@@ -380,27 +441,17 @@ void r_drawLineDef(const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t
 		float invDistance = f_lerp(lInvDepth, rInvDepth, t);
 		float depthF = 1.0f / invDistance;
 
-
-		float a = (v2f_dot(v2f_normalise(normal), camera.forward) * 0.5f) + 0.5f;
-		RGB_t colour = (RGB_t) {
-			.r=thisLineDef->colour.r*a,
-			.g=thisLineDef->colour.g*a,
-			.b=thisLineDef->colour.b*a
-		};
-		t_quantise(&colour);
-
-
 		if (isSolid) {
 			r_drawSolidColumn(
 				closeSectorID,
 				x, aspectRatio*invDistance,
-				fbPTR, resolution, colour
+				fbPTR, resolution, thisLineDef->texture
 			);
 		} else {
 			r_drawPortalColumn(
 				closeSectorID, farSectorID,
 				x, aspectRatio*invDistance,
-				fbPTR, resolution, colour
+				fbPTR, resolution, thisLineDef->texture
 			);
 		}
 	}
@@ -497,6 +548,27 @@ void r_initCamera(void) {
 }
 
 
+int r_loadTextures(void) {
+	const unsigned char* texturePaths[] = {
+		"textures/fallback.png"
+	};
+	unsigned int numTexturePaths = sizeof(texturePaths) / sizeof(texturePaths[0]);
+
+	numValidTextures = 0u;
+	for (unsigned int i=0u; i<numTexturePaths; i++) {
+		const unsigned char* path = texturePaths[i];
+
+		RGB_t* pixelData;
+		if (!r_loadTexture(path, &pixelData)) {printf("Failed to load [%s]\n", path); return FALSE; /* Failed to load texture */}
+
+		textures[numValidTextures++] = pixelData;
+		printf("Loaded [%s] successfully.\n", path);
+	}
+
+	return TRUE; //Success
+}
+
+
 
 void r_createGeometry(void) {
 	vertices[0] = (Vec2f_t){.x=-10.0f, .y= 10.0f};
@@ -513,70 +585,70 @@ void r_createGeometry(void) {
 	lineDefs[0] = (LineDef_t){
 		.vStart=0, .vEnd=1,
 		.frontSector=0, .backSector=-1,
-		.colour=RGB_RED,
+		.texture=0u,
 		.isValid=TRUE
 	};
 
 	lineDefs[1] = (LineDef_t){
 		.vStart=1, .vEnd=2,
 		.frontSector=2, .backSector=0,
-		.colour=RGB_CYAN,
+		.texture=0u,
 		.isValid=TRUE
 	};
 
 	lineDefs[2] = (LineDef_t){
 		.vStart=2, .vEnd=3,
 		.frontSector=0, .backSector=-1,
-		.colour=RGB_RED,
+		.texture=0u,
 		.isValid=TRUE
 	};
 
 	lineDefs[3] = (LineDef_t){
 		.vStart=3, .vEnd=4,
 		.frontSector=1, .backSector=0,
-		.colour=RGB_YELLOW,
+		.texture=0u,
 		.isValid=TRUE
 	};
 
 	lineDefs[4] = (LineDef_t){
 		.vStart=4, .vEnd=0,
 		.frontSector=0, .backSector=-1,
-		.colour=RGB_RED,
+		.texture=0u,
 		.isValid=TRUE
 	};
 
 	lineDefs[5] = (LineDef_t){
 		.vStart=3, .vEnd=5,
 		.frontSector=1, .backSector=-1,
-		.colour=RGB_BLUE,
+		.texture=0u,
 		.isValid=TRUE
 	};
 
 	lineDefs[6] = (LineDef_t){
 		.vStart=5, .vEnd=6,
 		.frontSector=1, .backSector=-1,
-		.colour=RGB_BLUE,
+		.texture=0u,
 		.isValid=TRUE
 	};
 
 	lineDefs[7] = (LineDef_t){
 		.vStart=6, .vEnd=4,
 		.frontSector=1, .backSector=-1,
-		.colour=RGB_BLUE,
+		.texture=0u,
 		.isValid=TRUE
 	};
 
 	lineDefs[8] = (LineDef_t){
 		.vStart=1, .vEnd=7,
 		.frontSector=2, .backSector=-1,
-		.colour=RGB_YELLOW,
+		.texture=0u,
 		.isValid=TRUE
 	};
 
 	lineDefs[9] = (LineDef_t){
 		.vStart=7, .vEnd=2,
 		.frontSector=2, .backSector=-1,
-		.colour=RGB_YELLOW,
+		.texture=0u,
 		.isValid=TRUE
 	};
 
@@ -591,7 +663,7 @@ void r_createGeometry(void) {
 	ldIndicesSector0[4] = 4;
 	sectors[0] = (Sector_t){
 		.floorHeight=-2.0f, .floorColour=RGB_RED,
-		.ceilingHeight=2.0f, .ceilingColour=RGB_WHITE,
+		.ceilingHeight=2.0f, .ceilingColour=RGB_MAGENTA,
 		.lineDefs=ldIndicesSector0, .numLineDefs=5
 	};
 
@@ -605,7 +677,7 @@ void r_createGeometry(void) {
 	ldIndicesSector1[3] = 7;
 	sectors[1] = (Sector_t){
 		.floorHeight=-3.0f, .floorColour=RGB_BLUE,
-		.ceilingHeight=3.0f, .ceilingColour=RGB_WHITE,
+		.ceilingHeight=3.0f, .ceilingColour=RGB_CYAN,
 		.lineDefs=ldIndicesSector1, .numLineDefs=4
 	};
 
@@ -618,7 +690,7 @@ void r_createGeometry(void) {
 	ldIndicesSector2[2] = 9;
 	sectors[2] = (Sector_t){
 		.floorHeight=-0.5f, .floorColour=RGB_GREEN,
-		.ceilingHeight=0.5f, .ceilingColour=RGB_WHITE,
+		.ceilingHeight=0.5f, .ceilingColour=RGB_YELLOW,
 		.lineDefs=ldIndicesSector2, .numLineDefs=3
 	};
 }

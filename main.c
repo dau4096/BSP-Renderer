@@ -54,6 +54,16 @@ int main(void) {
 		t_deleteFramebuffer();
 		return -1;
 	}
+
+	int texturesSuccess = r_loadTextures();
+	if (!texturesSuccess) {
+		//Failed to find valid keyboard.
+		printf("Failed to load texture data.\n");
+		io_quit();
+		t_deleteFramebuffer();
+		return -1;
+	}
+
 	r_initCamera();
 	r_createGeometry();
 
