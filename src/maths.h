@@ -158,7 +158,7 @@ static RGB_t rgb_fmul(const RGB_t a, float s) {
 	};
 }
 
-static RGB_t rgb_imul(const RGB_t a, int s) {
+static RGB_t rgb_umul(const RGB_t a, uint8_t s) {
 	return rgb_fmul(a, (float)(s) / 255.0f);	
 }
 

@@ -205,7 +205,7 @@ void r_drawSolidColumn(
 	//Draw ceiling.
 	ptr = fbPTR + screenX + (resolution.x * minYBound);
 	for (int y=minYBound; y<yLow; y++) {
-		*ptr = thisSector->ceilingColour;
+		*ptr = rgb_umul(thisSector->ceilingColour, thisSector->lightLevel);
 		ptr += resolution.x;
 	}
 
@@ -215,7 +215,7 @@ void r_drawSolidColumn(
 	if (!r_getColumn(textureID, textureX, &texPTR)) {return;}
 	for (int y=yLow; y<yTop; y++) {
 		float t = (float)(y - lowYBound) / (float)(topYBound - lowYBound);
-		*ptr = *(texPTR + (int)(t * (float)(TEXTURE_RESOLUTION.y)));
+		*ptr = rgb_umul(*(texPTR + (int)(t * (float)(TEXTURE_RESOLUTION.y))), thisSector->lightLevel);
 		ptr += resolution.x;
 	}
 	depthMap[screenX] = mappedDepth;
@@ -223,7 +223,7 @@ void r_drawSolidColumn(
 	//Draw floor.
 	ptr = fbPTR + screenX + (resolution.x * yTop);
 	for (int y=yTop; y<maxYBound; y++) {
-		*ptr = thisSector->floorColour;
+		*ptr = rgb_umul(thisSector->floorColour, thisSector->lightLevel);
 		ptr += resolution.x;	
 	}
 #endif
@@ -307,7 +307,7 @@ void r_drawPortalColumn(
 	//Draw the ceiling
 	ptr = fbPTR + screenX + (resolution.x * minYBound);
 	for (int y=minYBound; y<yLow; y++) {
-		*ptr = nearSector->ceilingColour;
+		*ptr = rgb_umul(nearSector->ceilingColour, nearSector->lightLevel);
 		ptr += resolution.x;	
 	}
 
@@ -320,7 +320,7 @@ void r_drawPortalColumn(
 		ptr = fbPTR + screenX + (resolution.x * lowYBoundNear);
 		for (int y=lowYBoundNear; y<lowYBoundFar; y++) {
 			float t = (float)(y - lowYBoundNearUnclamp) / (float)(lowYBoundFarUnclamp - lowYBoundNearUnclamp);
-			*ptr = *(texPTR + (int)(t * (float)TEXTURE_RESOLUTION.y));
+			*ptr = rgb_umul(*(texPTR + (int)(t * (float)TEXTURE_RESOLUTION.y)), nearSector->lightLevel);
 			ptr += resolution.x;
 		}
 	} else {
@@ -328,7 +328,7 @@ void r_drawPortalColumn(
 		lowYMap[screenX] = lowYBoundNear;
 		ptr = fbPTR + screenX + (resolution.x * lowYBoundFar);
 		for (int y=lowYBoundFar; y<lowYBoundNear; y++) {
-			*ptr = nearSector->ceilingColour;
+			*ptr = rgb_umul(nearSector->ceilingColour, nearSector->lightLevel);
 			ptr += resolution.x;
 		}
 	}
@@ -341,7 +341,7 @@ void r_drawPortalColumn(
 		ptr = fbPTR + screenX + (resolution.x * topYBoundFar);
 		for (int y=topYBoundFar; y<topYBoundNear; y++) {
 			float t = (float)(y - topYBoundFarUnclamp) / (float)(topYBoundNearUnclamp - topYBoundFarUnclamp);
-			*ptr = *(texPTR + (int)(t * (float)TEXTURE_RESOLUTION.y));
+			*ptr = rgb_umul(*(texPTR + (int)(t * (float)TEXTURE_RESOLUTION.y)), nearSector->lightLevel);
 			ptr += resolution.x;
 		}
 	} else {
@@ -349,7 +349,7 @@ void r_drawPortalColumn(
 		topYMap[screenX] = topYBoundNear;
 		ptr = fbPTR + screenX + (resolution.x * topYBoundNear);
 		for (int y=topYBoundNear; y<topYBoundFar; y++) {
-			*ptr = nearSector->floorColour;
+			*ptr = rgb_umul(nearSector->floorColour, nearSector->lightLevel);
 			ptr += resolution.x;
 		}
 	}
@@ -358,7 +358,7 @@ void r_drawPortalColumn(
 	//Draw the floor
 	ptr = fbPTR + screenX + (resolution.x * yTop);
 	for (int y=yTop; y<maxYBound; y++) {
-		*ptr = nearSector->floorColour;
+		*ptr = rgb_umul(nearSector->floorColour, nearSector->lightLevel);
 		ptr += resolution.x;
 	}
 #endif
@@ -669,7 +669,8 @@ void r_createGeometry(void) {
 	sectors[0] = (Sector_t){
 		.floorHeight=-2.0f, .floorColour=RGB_RED,
 		.ceilingHeight=2.0f, .ceilingColour=RGB_MAGENTA,
-		.lineDefs=ldIndicesSector0, .numLineDefs=5
+		.lineDefs=ldIndicesSector0, .numLineDefs=5,
+		.lightLevel=127u
 	};
 
 
@@ -683,7 +684,8 @@ void r_createGeometry(void) {
 	sectors[1] = (Sector_t){
 		.floorHeight=-3.0f, .floorColour=RGB_BLUE,
 		.ceilingHeight=3.0f, .ceilingColour=RGB_CYAN,
-		.lineDefs=ldIndicesSector1, .numLineDefs=4
+		.lineDefs=ldIndicesSector1, .numLineDefs=4,
+		.lightLevel=32u
 	};
 
 
@@ -696,7 +698,8 @@ void r_createGeometry(void) {
 	sectors[2] = (Sector_t){
 		.floorHeight=-0.5f, .floorColour=RGB_GREEN,
 		.ceilingHeight=0.5f, .ceilingColour=RGB_YELLOW,
-		.lineDefs=ldIndicesSector2, .numLineDefs=3
+		.lineDefs=ldIndicesSector2, .numLineDefs=3,
+		.lightLevel=255u
 	};
 }
 
