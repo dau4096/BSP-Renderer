@@ -7,6 +7,17 @@
 
 //////// DATA ////////
 extern Camera_t camera;
+
+
+
+//Placeholder values; replace with calloc() heap stuff later.
+#define MAX_VERTICES 64u
+#define MAX_LINEDEFS 32u
+#define MAX_SECTORS  16u
+
+extern Vec2f_t vertices[MAX_VERTICES];
+extern LineDef_t lineDefs[MAX_LINEDEFS];
+extern Sector_t sectors[MAX_SECTORS];
 //////// DATA ////////
 
 
@@ -27,6 +38,7 @@ void r_initCamera(void);
 int r_loadTextures(void);
 void r_createGeometry(void);
 //////// INITIALISATION ////////
+
 
 
 #endif

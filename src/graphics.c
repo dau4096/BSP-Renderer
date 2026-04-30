@@ -6,6 +6,9 @@
 #include <stdio.h>
 #include <string.h>
 
+
+#include "graphics.h"
+
 #include "types.h"
 #include "maths.h"
 #include "terminal.h"
@@ -16,11 +19,6 @@
 //Temporary, while camera is in 2D.
 Camera_t camera; //The view
 
-
-//Placeholder values; replace with calloc() heap stuff later.
-#define MAX_VERTICES 64
-#define MAX_LINEDEFS 32
-#define MAX_SECTORS  16
 
 Vec2f_t vertices[MAX_VERTICES]; //2D positions.
 LineDef_t lineDefs[MAX_LINEDEFS]; //LineDefs connecting vertices.

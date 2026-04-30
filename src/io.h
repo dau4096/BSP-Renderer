@@ -7,7 +7,7 @@ typedef enum {
 	K_MOVE_FORE, K_MOVE_BACK, K_MOVE_LEFT, K_MOVE_RIGHT,
 	K_MOVE_UP, K_MOVE_DOWN,
 	K_TURN_LEFT, K_TURN_RIGHT,
-	K_MOVE_FAST,
+	K_MOVE_FAST, K_MOVE_JUMP,
 	K_QUIT,
 
 	NUM_KEYS //Automatically gets "length" of valid key enums.
@@ -21,7 +21,7 @@ void io_quit(void);
 
 
 void io_pollEvents(void);
-void io_handleInputs(Camera_t* camera, double dt);
+Vec2f_t io_handleInputs(Camera_t* camera, double dt);
 
 
 

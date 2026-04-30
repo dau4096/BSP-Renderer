@@ -5,7 +5,7 @@ INCLUDE = -I/usr/include -I/usr/local/include
 LIBS = -lm -ldl -ludev -pthread
 
 
-SOURCES = main.c src/terminal.c src/io.c src/graphics.c
+SOURCES = main.c src/terminal.c src/io.c src/graphics.c src/physics.c
 OBJECTS = $(SOURCES:.c=.o)
 BINFILE = prgm.x86_64
 
@@ -21,7 +21,7 @@ release: $(OBJECTS)
 
 debug: CFLAGS := -g -DDEBUG -DCOLOUR_QUANTISATION #-DDEBUG_BORDERS #-DSUPPRESS_FRAMEBUFFER_OUTPUT
 debug: $(OBJECTS)
-	$(CC) $(OBJECTS) $(LIBS) -o $(BINFILE)
+	$(CC) $(OBJECTS) $(LIBS) -o $(BINFILE) #-pg
 
 %.o: %.c %.h
 	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@

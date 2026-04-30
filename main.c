@@ -9,6 +9,7 @@
 #include "src/terminal.h"
 #include "src/io.h"
 #include "src/graphics.h"
+#include "src/physics.h"
 
 
 
@@ -94,9 +95,9 @@ int main(void) {
 
 		//Tasks for this frame;
 	#ifdef LIMITED_FREQ
-		io_handleInputs(&camera, DT);
+		p_updateCamera(&camera, DT);
 	#else
-		io_handleInputs(&camera, dt);
+		p_updateCamera(&camera, dt);
 	#endif
 
 		//Render frame

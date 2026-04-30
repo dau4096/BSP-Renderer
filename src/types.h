@@ -71,6 +71,8 @@ typedef struct {
 typedef struct {
 	Vec2f_t position; float Z; //Position, 2D with seperate height (z).
 	Vec2f_t forward;
+	float Zvelocity; //Vertical speed.
+
 	float yaw; //Yaw in radians
 	float FOV; //FOV in radians
 	float maxDistance; //Maximum view distance

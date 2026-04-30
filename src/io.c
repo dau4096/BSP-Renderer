@@ -122,7 +122,9 @@ int getID(int key) {
 		case KEY_D: {return K_MOVE_RIGHT;}
 		case KEY_E: {return K_MOVE_UP;}
 		case KEY_Q: {return K_MOVE_DOWN;}
+
 		case KEY_LEFTSHIFT: {return K_MOVE_FAST;}
+		case KEY_SPACE: {return K_MOVE_JUMP;}
 
 		case KEY_LEFT: {return K_TURN_LEFT;}
 		case KEY_RIGHT: {return K_TURN_RIGHT;}
@@ -185,7 +187,9 @@ static int getID(int vk) {
 		case 'D': {return K_MOVE_RIGHT;}
 		case 'E': {return K_MOVE_UP;}
 		case 'Q': {return K_MOVE_DOWN;}
+
 		case VK_LSHIFT: {return K_MOVE_FAST;}
+		case VK_SPACE: {return K_MOVE_JUMP;}
 
 		case VK_LEFT:  {return K_TURN_LEFT;}
 		case VK_RIGHT: {return K_TURN_RIGHT;}
@@ -217,7 +221,10 @@ void io_pollEvents(void) {
 
 #define MOVEMENT_SPEED_BASE 2.0f /* In units/second */
 #define TURNING_SPEED 2.75f/* In radians/second */
-void io_handleInputs(Camera_t* camera, double dt) {
+#define JUMP_SPEED 1.0f /* 1-time impulse */
+
+int prevJump = FALSE;
+Vec2f_t io_handleInputs(Camera_t* camera, double dt) {
 	//Camera Controls
 	if (keyMap[K_TURN_LEFT]) {camera->yaw -= TURNING_SPEED * dt;}
 	if (keyMap[K_TURN_RIGHT]) {camera->yaw += TURNING_SPEED * dt;}
@@ -235,14 +242,16 @@ void io_handleInputs(Camera_t* camera, double dt) {
 	Vec2f_t forward = v2f_mul(camera->forward, movementSpeed);
 	Vec2f_t right = (Vec2f_t){.x=forward.y, .y=-forward.x};
 
-	if (keyMap[K_MOVE_FORE]) {camera->position = v2f_add(camera->position, forward);}
-	if (keyMap[K_MOVE_BACK]) {camera->position = v2f_sub(camera->position, forward);}
-	if (keyMap[K_MOVE_LEFT]) {camera->position = v2f_sub(camera->position, right);}
-	if (keyMap[K_MOVE_RIGHT]) {camera->position = v2f_add(camera->position, right);}
+	Vec2f_t moveDelta = (Vec2f_t){.x=0.0f, .y=0.0f};
+	if (keyMap[K_MOVE_FORE]) {moveDelta = v2f_add(moveDelta, forward);}
+	if (keyMap[K_MOVE_BACK]) {moveDelta = v2f_sub(moveDelta, forward);}
+	if (keyMap[K_MOVE_LEFT]) {moveDelta = v2f_sub(moveDelta, right);}
+	if (keyMap[K_MOVE_RIGHT]) {moveDelta = v2f_add(moveDelta, right);}
 	if (keyMap[K_MOVE_UP]) {camera->Z += movementSpeed;}
 	if (keyMap[K_MOVE_DOWN]) {camera->Z -= movementSpeed;}
 
-#ifdef SUPRESS_FRAMEBUFFER_OUTPUT
-	printf("(%f, %f) [%f]\n", camera->position.x, camera->position.y, camera->yaw);
-#endif
+	if (keyMap[K_MOVE_JUMP] && !prevJump) {camera->Zvelocity += JUMP_SPEED;}
+	prevJump = keyMap[K_MOVE_JUMP];
+
+	return moveDelta;
 }
