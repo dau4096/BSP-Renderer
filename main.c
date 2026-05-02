@@ -112,7 +112,7 @@ int main(void) {
 
 
 		dt = now() - start;
-		printf("Frame %d took: %.3lfms Theoretical FPS: %.0lf", frameNumber, dt*1000.0, 1.0 / dt); //Display real DT.
+		printf("Frame %d took: %.3lfms Theoretical FPS: ~%.0lf", frameNumber, dt*1000.0, 1.0 / dt); //Display real DT.
 	#ifdef SUPPRESS_FRAMEBUFFER_OUTPUT
 		printf("\n");
 	#endif

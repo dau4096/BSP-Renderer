@@ -14,10 +14,16 @@
 static float f_lerp(float a, float b, float t) {
 	return a + (b-a)*t;
 }
+static Vec2f_t v2f_lerp(Vec2f_t a, Vec2f_t b, float t) {
+	return (Vec2f_t){
+		.x=a.x + (b.x-a.x)*t,
+		.y=a.y + (b.y-a.y)*t
+	};
+}
 
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
-
+#define CLAMP(a,mi,ma) (((a)>(mi)) ? (((a)<(ma)) ? (a) : (ma)) : (mi))
 
 //////// GENERIC MATHS ////////
 
@@ -121,6 +127,16 @@ static float v2f_len(const Vec2f_t a) {
 
 
 
+static int v2i_dist(const Vec2i_t a, const Vec2i_t b) {
+	return v2i_len(v2i_sub(a, b));
+}
+
+static float v2f_dist(const Vec2f_t a, const Vec2f_t b) {
+	return v2f_len(v2f_sub(a, b));
+}
+
+
+
 static Vec2i_t v2i_normalise(const Vec2i_t a) {
 	int mag = (int)sqrtf((float)v2i_lenSQ(a));
 	return v2i_div(a, mag);
@@ -129,6 +145,38 @@ static Vec2i_t v2i_normalise(const Vec2i_t a) {
 static Vec2f_t v2f_normalise(const Vec2f_t a) {
 	float mag = sqrtf(v2f_lenSQ(a));
 	return v2f_div(a, mag);
+}
+
+
+
+static Vec2i_t v2i_min(const Vec2i_t a, const Vec2i_t b) {
+	return (Vec2i_t){
+		.x=MIN(a.x, b.x),
+		.y=MIN(a.x, b.x)
+	};
+}
+
+static Vec2f_t v2f_min(const Vec2f_t a, const Vec2f_t b) {
+	return (Vec2f_t){
+		.x=MIN(a.x, b.x),
+		.y=MIN(a.x, b.x)
+	};
+}
+
+
+
+static Vec2i_t v2i_max(const Vec2i_t a, const Vec2i_t b) {
+	return (Vec2i_t){
+		.x=MAX(a.x, b.x),
+		.y=MAX(a.x, b.x)
+	};
+}
+
+static Vec2f_t v2f_max(const Vec2f_t a, const Vec2f_t b) {
+	return (Vec2f_t){
+		.x=MAX(a.x, b.x),
+		.y=MAX(a.x, b.x)
+	};
 }
 
 //////// VECTOR 2D MATHS ////////

@@ -120,8 +120,6 @@ int getID(int key) {
 		case KEY_S: {return K_MOVE_BACK;}
 		case KEY_A: {return K_MOVE_LEFT;}
 		case KEY_D: {return K_MOVE_RIGHT;}
-		case KEY_E: {return K_MOVE_UP;}
-		case KEY_Q: {return K_MOVE_DOWN;}
 
 		case KEY_LEFTSHIFT: {return K_MOVE_FAST;}
 		case KEY_SPACE: {return K_MOVE_JUMP;}
@@ -185,8 +183,6 @@ static int getID(int vk) {
 		case 'S': {return K_MOVE_BACK;}
 		case 'A': {return K_MOVE_LEFT;}
 		case 'D': {return K_MOVE_RIGHT;}
-		case 'E': {return K_MOVE_UP;}
-		case 'Q': {return K_MOVE_DOWN;}
 
 		case VK_LSHIFT: {return K_MOVE_FAST;}
 		case VK_SPACE: {return K_MOVE_JUMP;}
@@ -218,40 +214,3 @@ void io_pollEvents(void) {
 
 
 
-
-#define MOVEMENT_SPEED_BASE 2.0f /* In units/second */
-#define TURNING_SPEED 2.75f/* In radians/second */
-#define JUMP_SPEED 1.0f /* 1-time impulse */
-
-int prevJump = FALSE;
-Vec2f_t io_handleInputs(Camera_t* camera, double dt) {
-	//Camera Controls
-	if (keyMap[K_TURN_LEFT]) {camera->yaw -= TURNING_SPEED * dt;}
-	if (keyMap[K_TURN_RIGHT]) {camera->yaw += TURNING_SPEED * dt;}
-	camera->yaw = fmod(camera->yaw, 2.0f * M_PI);
-	if (camera->yaw < 0.0f) {camera->yaw += 2.0f * M_PI;}
-
-	camera->forward = (Vec2f_t){
-		.x=sin(camera->yaw), .y=cos(camera->yaw)
-	};
-
-
-	//Move camera based on inputs.
-	float movementSpeed = MOVEMENT_SPEED_BASE * dt;
-	if (keyMap[K_MOVE_FAST]) {movementSpeed *= 2.5f;}
-	Vec2f_t forward = v2f_mul(camera->forward, movementSpeed);
-	Vec2f_t right = (Vec2f_t){.x=forward.y, .y=-forward.x};
-
-	Vec2f_t moveDelta = (Vec2f_t){.x=0.0f, .y=0.0f};
-	if (keyMap[K_MOVE_FORE]) {moveDelta = v2f_add(moveDelta, forward);}
-	if (keyMap[K_MOVE_BACK]) {moveDelta = v2f_sub(moveDelta, forward);}
-	if (keyMap[K_MOVE_LEFT]) {moveDelta = v2f_sub(moveDelta, right);}
-	if (keyMap[K_MOVE_RIGHT]) {moveDelta = v2f_add(moveDelta, right);}
-	if (keyMap[K_MOVE_UP]) {camera->Z += movementSpeed;}
-	if (keyMap[K_MOVE_DOWN]) {camera->Z -= movementSpeed;}
-
-	if (keyMap[K_MOVE_JUMP] && !prevJump) {camera->Zvelocity += JUMP_SPEED;}
-	prevJump = keyMap[K_MOVE_JUMP];
-
-	return moveDelta;
-}

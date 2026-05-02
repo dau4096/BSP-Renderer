@@ -20,9 +20,9 @@
 Camera_t camera; //The view
 
 
-Vec2f_t vertices[MAX_VERTICES]; //2D positions.
-LineDef_t lineDefs[MAX_LINEDEFS]; //LineDefs connecting vertices.
-Sector_t sectors[MAX_SECTORS]; //Sectors made of LineDefs.
+Vec2f_t g_vertices[MAX_VERTICES]; //2D positions.
+LineDef_t g_lineDefs[MAX_LINEDEFS]; //LineDefs connecting vertices.
+Sector_t g_sectors[MAX_SECTORS]; //Sectors made of LineDefs.
 //////// DATA ////////
 
 
@@ -173,7 +173,7 @@ void r_drawSolidColumn(
 
 	//Draw this wall collumn.
 	int lowYBound, topYBound; //Area this column should span (inside segment)
-	const Sector_t* thisSector = sectors + sectorID;
+	const Sector_t* thisSector = g_sectors + sectorID;
 	r_getLineDefSectorProjections(
 		thisSector, invDistance, &lowYBound, &topYBound, resolution
 	);
@@ -244,7 +244,7 @@ void r_drawPortalColumn(
 	//Draw the ceiling, top part of the wall (if relevant), lower part (if relevant), and floor.
 	//Close sector's projections;
 	int lowYBoundNearUnclamp, topYBoundNearUnclamp;
-	const Sector_t* nearSector = sectors + closeSectorID;
+	const Sector_t* nearSector = g_sectors + closeSectorID;
 	r_getLineDefSectorProjections(
 		nearSector, invDistance, &lowYBoundNearUnclamp, &topYBoundNearUnclamp, resolution
 	);
@@ -254,7 +254,7 @@ void r_drawPortalColumn(
 
 	//Far sector's projections;
 	int lowYBoundFarUnclamp, topYBoundFarUnclamp;
-	const Sector_t* farSector = sectors + farSectorID;
+	const Sector_t* farSector = g_sectors + farSectorID;
 	r_getLineDefSectorProjections(
 		farSector, invDistance, &lowYBoundFarUnclamp, &topYBoundFarUnclamp, resolution
 	);
@@ -367,8 +367,8 @@ void r_drawPortalColumn(
 
 void r_drawLineDef(const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t* fbPTR) {
 	//Interpolate from start-end along the Segment.
-	Vec2f_t start = vertices[thisLineDef->vStart];
-	Vec2f_t end = vertices[thisLineDef->vEnd];
+	Vec2f_t start = g_vertices[thisLineDef->vStart];
+	Vec2f_t end = g_vertices[thisLineDef->vEnd];
 
 	float dStart = v2f_dot(camera.forward, v2f_sub(start, camera.position));
 	float dEnd = v2f_dot(camera.forward, v2f_sub(end, camera.position));
@@ -464,8 +464,8 @@ void r_drawLineDef(const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t
 
 float r_getLineDefDistance(const LineDef_t* thisLineDef) {
 	//Get distance from camera.
-	Vec2f_t start = vertices[thisLineDef->vStart];
-	Vec2f_t end = vertices[thisLineDef->vEnd];
+	Vec2f_t start = g_vertices[thisLineDef->vStart];
+	Vec2f_t end = g_vertices[thisLineDef->vEnd];
 
 	Vec2f_t delta = v2f_sub(end, start);
 	float lengthSQ = v2f_lenSQ(delta);
@@ -501,7 +501,7 @@ void r_sortLineDefs(
 	unsigned int numSorts = 0u;
 
 	for (unsigned int ldIndex=0u; ldIndex<MAX_LINEDEFS; ldIndex++) {
-		LineDef_t* thisLineDef = lineDefs + ldIndex;
+		LineDef_t* thisLineDef = g_lineDefs + ldIndex;
 		if (!(thisLineDef->isValid)) {continue;}
 		(*numValidLineDefs)++;
 		sorts[numSorts++] = (LineDefSort_t){
@@ -574,81 +574,81 @@ int r_loadTextures(void) {
 
 
 void r_createGeometry(void) {
-	vertices[0] = (Vec2f_t){.x=-10.0f, .y= 10.0f};
-	vertices[1] = (Vec2f_t){.x= 10.0f, .y= 10.0f};
-	vertices[2] = (Vec2f_t){.x= 15.0f, .y=-10.0f};
-	vertices[3] = (Vec2f_t){.x=-17.5f, .y=-10.0f};
-	vertices[4] = (Vec2f_t){.x=-20.0f, .y=  0.0f};
-	vertices[5] = (Vec2f_t){.x=-30.0f, .y=-10.0f};
-	vertices[6] = (Vec2f_t){.x=-25.0f, .y=  0.0f};
-	vertices[7] = (Vec2f_t){.x= 15.0f, .y= 10.0f};
+	g_vertices[0] = (Vec2f_t){.x=-10.0f, .y= 10.0f};
+	g_vertices[1] = (Vec2f_t){.x= 10.0f, .y= 10.0f};
+	g_vertices[2] = (Vec2f_t){.x= 15.0f, .y=-10.0f};
+	g_vertices[3] = (Vec2f_t){.x=-17.5f, .y=-10.0f};
+	g_vertices[4] = (Vec2f_t){.x=-20.0f, .y=  0.0f};
+	g_vertices[5] = (Vec2f_t){.x=-30.0f, .y=-10.0f};
+	g_vertices[6] = (Vec2f_t){.x=-25.0f, .y=  0.0f};
+	g_vertices[7] = (Vec2f_t){.x= 15.0f, .y= 10.0f};
 
 
 
-	lineDefs[0] = (LineDef_t){
+	g_lineDefs[0] = (LineDef_t){
 		.vStart=0, .vEnd=1,
 		.frontSector=0, .backSector=-1,
 		.texture=0u,
 		.isValid=TRUE
 	};
 
-	lineDefs[1] = (LineDef_t){
+	g_lineDefs[1] = (LineDef_t){
 		.vStart=1, .vEnd=2,
 		.frontSector=2, .backSector=0,
 		.texture=0u,
 		.isValid=TRUE
 	};
 
-	lineDefs[2] = (LineDef_t){
+	g_lineDefs[2] = (LineDef_t){
 		.vStart=2, .vEnd=3,
 		.frontSector=0, .backSector=-1,
 		.texture=0u,
 		.isValid=TRUE
 	};
 
-	lineDefs[3] = (LineDef_t){
+	g_lineDefs[3] = (LineDef_t){
 		.vStart=3, .vEnd=4,
 		.frontSector=1, .backSector=0,
 		.texture=0u,
 		.isValid=TRUE
 	};
 
-	lineDefs[4] = (LineDef_t){
+	g_lineDefs[4] = (LineDef_t){
 		.vStart=4, .vEnd=0,
 		.frontSector=0, .backSector=-1,
 		.texture=0u,
 		.isValid=TRUE
 	};
 
-	lineDefs[5] = (LineDef_t){
+	g_lineDefs[5] = (LineDef_t){
 		.vStart=3, .vEnd=5,
 		.frontSector=1, .backSector=-1,
 		.texture=0u,
 		.isValid=TRUE
 	};
 
-	lineDefs[6] = (LineDef_t){
+	g_lineDefs[6] = (LineDef_t){
 		.vStart=5, .vEnd=6,
 		.frontSector=1, .backSector=-1,
 		.texture=0u,
 		.isValid=TRUE
 	};
 
-	lineDefs[7] = (LineDef_t){
+	g_lineDefs[7] = (LineDef_t){
 		.vStart=6, .vEnd=4,
 		.frontSector=1, .backSector=-1,
 		.texture=0u,
 		.isValid=TRUE
 	};
 
-	lineDefs[8] = (LineDef_t){
+	g_lineDefs[8] = (LineDef_t){
 		.vStart=1, .vEnd=7,
 		.frontSector=2, .backSector=-1,
 		.texture=0u,
 		.isValid=TRUE
 	};
 
-	lineDefs[9] = (LineDef_t){
+	g_lineDefs[9] = (LineDef_t){
 		.vStart=7, .vEnd=2,
 		.frontSector=2, .backSector=-1,
 		.texture=0u,
@@ -664,7 +664,7 @@ void r_createGeometry(void) {
 	ldIndicesSector0[2] = 2;
 	ldIndicesSector0[3] = 3;
 	ldIndicesSector0[4] = 4;
-	sectors[0] = (Sector_t){
+	g_sectors[0] = (Sector_t){
 		.floorHeight=-2.0f, .floorColour=RGB_RED,
 		.ceilingHeight=2.0f, .ceilingColour=RGB_MAGENTA,
 		.lineDefs=ldIndicesSector0, .numLineDefs=5,
@@ -679,7 +679,7 @@ void r_createGeometry(void) {
 	ldIndicesSector1[1] = 5;
 	ldIndicesSector1[2] = 6;
 	ldIndicesSector1[3] = 7;
-	sectors[1] = (Sector_t){
+	g_sectors[1] = (Sector_t){
 		.floorHeight=-3.0f, .floorColour=RGB_BLUE,
 		.ceilingHeight=3.0f, .ceilingColour=RGB_CYAN,
 		.lineDefs=ldIndicesSector1, .numLineDefs=4,
@@ -693,7 +693,7 @@ void r_createGeometry(void) {
 	ldIndicesSector2[0] = 1;
 	ldIndicesSector2[1] = 8;
 	ldIndicesSector2[2] = 9;
-	sectors[2] = (Sector_t){
+	g_sectors[2] = (Sector_t){
 		.floorHeight=-0.5f, .floorColour=RGB_GREEN,
 		.ceilingHeight=0.5f, .ceilingColour=RGB_YELLOW,
 		.lineDefs=ldIndicesSector2, .numLineDefs=3,
