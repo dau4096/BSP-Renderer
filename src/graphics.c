@@ -86,6 +86,7 @@ RGB_t* textures[MAX_TEXTURES]; //Stores texture data. Each entry is a 32×32 gri
 
 
 int r_loadTexture(const char* path, RGB_t** pixels) { //Returns success
+	stbi_set_flip_vertically_on_load(TRUE);
 	int width, height, channels;
 	unsigned char* textureDataSTBI = stbi_load(
 		path,
@@ -151,8 +152,8 @@ int r_getCentreX(const Vec2f_t position, const Vec2i_t resolution) {
 void r_getLineDefSectorProjections(
 	const Sector_t* thisSector, float invDistance, int* lowY, int* topY, const Vec2i_t resolution
 ) {
-	float projectedYFloor = -(camera.Z + thisSector->floorHeight) * invDistance;
-	float projectedYCeiling = -(camera.Z + thisSector->ceilingHeight) * invDistance;
+	float projectedYFloor = (camera.Z - thisSector->floorHeight) * invDistance;
+	float projectedYCeiling = (camera.Z - thisSector->ceilingHeight) * invDistance;
 
 	*lowY = (int)((float)(resolution.y) * (0.5f - projectedYFloor));
 	*topY = (int)((float)(resolution.y) * (0.5f - projectedYCeiling));
@@ -197,13 +198,14 @@ void r_drawSolidColumn(
 
 #else
 
-	//Draws top-to-bottom vertically.
+	//Draws top-to-bottom vertically. (Image is flipped when drawing to console)
 	RGB_t* ptr;
 
 	//Draw ceiling.
 	ptr = fbPTR + screenX + (resolution.x * minYBound);
+	RGB_t floorColour = rgb_umul(thisSector->floorColour, thisSector->lightLevel);
 	for (int y=minYBound; y<yLow; y++) {
-		*ptr = rgb_umul(thisSector->ceilingColour, thisSector->lightLevel);
+		*ptr = floorColour;
 		ptr += resolution.x;
 	}
 
@@ -220,8 +222,9 @@ void r_drawSolidColumn(
 
 	//Draw floor.
 	ptr = fbPTR + screenX + (resolution.x * yTop);
+	RGB_t ceilingColour = rgb_umul(thisSector->ceilingColour, thisSector->lightLevel);
 	for (int y=yTop; y<maxYBound; y++) {
-		*ptr = rgb_umul(thisSector->floorColour, thisSector->lightLevel);
+		*ptr = ceilingColour;
 		ptr += resolution.x;	
 	}
 #endif
@@ -300,16 +303,18 @@ void r_drawPortalColumn(
 
 	//Draws top-to-bottom vertically.
 	RGB_t* ptr;
+	RGB_t floorColour = rgb_umul(nearSector->floorColour, nearSector->lightLevel);
+	RGB_t ceilingColour = rgb_umul(nearSector->ceilingColour, nearSector->lightLevel);
 
 
 	//Draw the ceiling
 	ptr = fbPTR + screenX + (resolution.x * minYBound);
 	for (int y=minYBound; y<yLow; y++) {
-		*ptr = rgb_umul(nearSector->ceilingColour, nearSector->lightLevel);
-		ptr += resolution.x;	
+		*ptr = floorColour;
+		ptr += resolution.x;
 	}
 
-	//Draw the lower (Y value, higher onscreen) section of the portal
+	//Draw the lower (Y value, lower onscreen) section of the portal
 	RGB_t* texPTR;
 	if (!r_getColumn(textureID, textureX, &texPTR)) {return;}
 	if (lowYBoundNear < lowYBoundFar) {
@@ -326,13 +331,13 @@ void r_drawPortalColumn(
 		lowYMap[screenX] = lowYBoundNear;
 		ptr = fbPTR + screenX + (resolution.x * lowYBoundFar);
 		for (int y=lowYBoundFar; y<lowYBoundNear; y++) {
-			*ptr = rgb_umul(nearSector->ceilingColour, nearSector->lightLevel);
+			*ptr = floorColour;
 			ptr += resolution.x;
 		}
 	}
 
 
-	//Draw the upper (Y value, lower onscreen) section of the portal
+	//Draw the upper (Y value, higher onscreen) section of the portal
 	if (topYBoundNear > topYBoundFar) {
 		//Draw a connecting wall between them and fill Y fill data.
 		topYMap[screenX] = topYBoundFar;
@@ -347,7 +352,7 @@ void r_drawPortalColumn(
 		topYMap[screenX] = topYBoundNear;
 		ptr = fbPTR + screenX + (resolution.x * topYBoundNear);
 		for (int y=topYBoundNear; y<topYBoundFar; y++) {
-			*ptr = rgb_umul(nearSector->floorColour, nearSector->lightLevel);
+			*ptr = ceilingColour;
 			ptr += resolution.x;
 		}
 	}
@@ -356,7 +361,7 @@ void r_drawPortalColumn(
 	//Draw the floor
 	ptr = fbPTR + screenX + (resolution.x * yTop);
 	for (int y=yTop; y<maxYBound; y++) {
-		*ptr = rgb_umul(nearSector->floorColour, nearSector->lightLevel);
+		*ptr = ceilingColour;
 		ptr += resolution.x;
 	}
 #endif
@@ -680,8 +685,8 @@ void r_createGeometry(void) {
 	ldIndicesSector1[2] = 6;
 	ldIndicesSector1[3] = 7;
 	g_sectors[1] = (Sector_t){
-		.floorHeight=-3.0f, .floorColour=RGB_BLUE,
-		.ceilingHeight=3.0f, .ceilingColour=RGB_CYAN,
+		.floorHeight=-2.25f, .floorColour=RGB_BLUE,
+		.ceilingHeight=5.0f, .ceilingColour=RGB_CYAN,
 		.lineDefs=ldIndicesSector1, .numLineDefs=4,
 		.lightLevel=32u
 	};

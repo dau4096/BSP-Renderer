@@ -169,14 +169,14 @@ void t_drawFramebuffer(void) {
 	RGB_t lowPrev = RGB_BLACK;
 	int hasReset = TRUE; ///May not be accurate, force a colour change.
 
-    for (uint y=0u; y<HEIGHT; y+=2u) {
+    for (uint y=HEIGHT; y>0u; y-=2u) {
         for (uint x=0u; x<WIDTH; x++) {
 
             int topIndex = (y * WIDTH) + x;
             int lowIndex = ((y + 1) * WIDTH) + x;
 
-            RGB_t top = framebuffer.data[topIndex];
-            RGB_t low = (y + 1 < HEIGHT) ? framebuffer.data[lowIndex] : RGB_BLACK;
+            RGB_t top = (y + 1 < HEIGHT) ? framebuffer.data[lowIndex] : RGB_BLACK;
+            RGB_t low = framebuffer.data[topIndex];
 
 
             //Check if the colour needs to change.

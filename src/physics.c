@@ -10,16 +10,18 @@
 
 
 //////// CONSTANTS ////////
-#define CAMERA_FEET_OFFSET -1.65f /* Z offset of cameraZ to bottom of camera (bottom of "feet") */
-#define CAMERA_HEAD_OFFSET  0.10f /* Z offset of cameraZ to top of camera (top of "head") */
-#define CAMERA_HIT_RADIUS   0.25f /* Cylindrical collision: radius. */
-#define CAMERA_MAX_STEP     0.25f /* Maximum Z-delta the camera is allowed to step up. */
+#define CAMERA_FEET_OFFSET   -1.650f /* Z offset of cameraZ to bottom of camera (bottom of "feet") */
+#define CAMERA_HEAD_OFFSET    0.100f /* Z offset of cameraZ to top of camera (top of "head") */
+#define CAMERA_HIT_RADIUS     0.250f /* Cylindrical collision: radius. */
+#define CAMERA_PORTAL_RADIUS  0.125f /* Radius at which portals are allowed to swap sectors. */
+#define CAMERA_MAX_STEP       0.500f /* Maximum Z-delta the camera is allowed to step up. */
 
 #define MOVEMENT_SPEED_BASE 2.0f /* In units/second */
 #define TURNING_SPEED 2.75f/* In radians/second */
 #define JUMP_SPEED 0.25f /* 1-time impulse */
 
-#define GRAVITY -0.01f /* Gravity acceleration in units/second² */
+#define GRAVITY -0.1f /* Gravity acceleration in units/second² */
+#define EPSILON 1.0e-5f /* For FP-precision reasons */
 //////// CONSTANTS ////////
 
 typedef struct {Vec2f_t start, end, delta;} Movement_t; //Contains info about the camera's movement.
@@ -68,18 +70,29 @@ int p_getLDintersect(LineDef_t* thisLineDef, const Movement_t* motion, float* in
 	}
 
 	
-	//Check the actual line;
-	if (p_circleLineIntersect(start, end, motion->start, CAMERA_HIT_RADIUS, intersectDistance)) {
-		//Must have hit somewhere along the line.
-		return TRUE;
+	//Check the actual line at multiple points;
+	unsigned int steps = (int)(ceil(v2f_len(motion->delta) / CAMERA_HIT_RADIUS));
+	Vec2f_t step = v2f_mul(motion->delta, 1.0f / (float)(steps));
+	for (unsigned int i=0u; i<steps; i++) {
+		Vec2f_t delta = v2f_mul(step, (float)(i));
+		Movement_t submotion = (Movement_t){
+			.start=motion->start, .end=v2f_add(motion->start, delta), .delta=delta
+		};
+
+		if (p_circleLineIntersect(start, end, submotion.end, CAMERA_HIT_RADIUS, intersectDistance)) {
+			//Must have hit somewhere along the line.
+			return TRUE;
+		}
 	}
 
 	return FALSE;
 }
 
 
-#define currentPosition camera->position
+
+
 unsigned int currentSectorID = 0u; //Init at 0, maybe add some checking later for where to start.
+int isInPortal = FALSE;
 int p_getSectorID(
 	const Camera_t* camera, Sector_t** currentSector, Movement_t* motion
 ) { //Returns whether or not a linedef was hit.
@@ -95,11 +108,17 @@ int p_getSectorID(
 		int intersected = p_getLDintersect(thisLineDef, motion, &intersectDistance);
 		if (!intersected) {continue; /* Move onto the next LD. */}
 
+		Vec2f_t start = g_vertices[thisLineDef->vStart];
+		Vec2f_t end = g_vertices[thisLineDef->vEnd];
+		Vec2f_t ldDir = v2f_sub(end, start);
+		Vec2f_t normal = v2f_normalise((Vec2f_t){.x=-ldDir.y, .y=ldDir.x});
+
 		hitLineDef = TRUE;
 		int isSolid = p_isLineDefSolid(thisLineDef);
 		if (!isSolid) {
 			//Portal; check camera can "step" up the Z-delta before allowing through. Otherwise restrict.
 			//If can step through, change ID to be new sector
+			//if (intersectDistance > CAMERA_PORTAL_RADIUS) {continue; /* Didn't get close enough. */}
 
 			unsigned int newSectorID; //ID of new sector to check.
 			if (thisLineDef->frontSector == currentSectorID) {newSectorID = thisLineDef->backSector;}
@@ -107,29 +126,43 @@ int p_getSectorID(
 			Sector_t* newSector = g_sectors + newSectorID; //New sector to check against.
 
 			float cameraFootZ = camera->Z + CAMERA_FEET_OFFSET;
-			if (newSector->floorHeight > (cameraFootZ + CAMERA_MAX_STEP)) {isSolid = TRUE; /* Can't step up this, too high. */}
-			else {
+			float cameraHeadZ = camera->Z + CAMERA_HEAD_OFFSET;
+			if (
+				(newSector->floorHeight > (cameraFootZ + CAMERA_MAX_STEP)) || //Too high
+				(newSector->ceilingHeight < cameraHeadZ) //Too low
+			) {isSolid = TRUE; /* Can't step into this, too high or too low. */}
+			else if (
+				(
+					v2f_dot(v2f_sub(motion->start, start), normal) >= 0.0f
+				) != (
+					v2f_dot(v2f_sub(motion->end, start), normal) >= 0.0f
+				)
+			) {
 				//Can walk through, change to new sector.
 				currentSectorID = newSectorID;
 				thisSector = newSector;
+				isInPortal = TRUE;
 			}
 		}
 
 		if (isSolid) {
 			//Solid wall, restrict motion so camera doesn't pass through.
 			//Can also happen from portals with too high step delta.
-			Vec2f_t offset = v2f_mul(
-				v2f_normalise(motion->delta),
-				-intersectDistance
-			);
-			motion->end = v2f_add(motion->end, offset);
-			motion->delta = v2f_sub(motion->end, motion->start);
+
+			float dist = v2f_dot(v2f_sub(motion->end, start), normal);
+			float pen = CAMERA_HIT_RADIUS - fabs(intersectDistance);
+			if (pen > EPSILON) {
+				float dir = (dist >= 0.0f) ? 1.0f : -1.0f;
+				motion->end = v2f_add(motion->end, v2f_mul(normal, dir * pen));
+			}
 		}
 
 		break; //No need to check any more.
 	}
+
+
 	*currentSector = thisSector;
-	if (!hitLineDef) {return FALSE;}
+	if (!hitLineDef) {isInPortal=FALSE; return FALSE;}
 
 
 	return TRUE;
