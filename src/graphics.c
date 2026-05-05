@@ -412,34 +412,34 @@ int r_clipLDVertices(Vec2f_t* start, Vec2f_t* end, float* startT, float* endT) {
 	}
 
 
-	Vec2f_t ldDelta = v2f_sub(*end, *start);
+	Vec2f_t unmodStart = *start, unmodEnd = *end;
 	if (lDotStart < 0.0f) {
 		//Start is NOT in the view already, should modify.
 		float t = lDotStart / (lDotStart - lDotEnd);
-		Vec2f_t dir = v2f_sub(*end, *start);
-		*start = v2f_add(*start, v2f_mul(dir, t));
+		Vec2f_t dir = v2f_sub(unmodEnd, unmodStart);
+		*start = v2f_add(unmodStart, v2f_mul(dir, t));
 		*startT = t;
 
 	} else if (rDotStart < 0.0f) {
 		//Start is NOT in the view already, should modify.
 		float t = rDotStart / (rDotStart - rDotEnd);
-		Vec2f_t dir = v2f_sub(*end, *start);
-		*start = v2f_add(*start, v2f_mul(dir, t));
+		Vec2f_t dir = v2f_sub(unmodEnd, unmodStart);
+		*start = v2f_add(unmodStart, v2f_mul(dir, t));
 		*startT = t;
 	}
 
 	if (lDotEnd < 0.0f) {
 		//End is NOT in the view already, should modify.
 		float t = lDotStart / (lDotStart - lDotEnd);
-		Vec2f_t dir = v2f_sub(*end, *start);
-		*end = v2f_add(*start, v2f_mul(dir, t));
+		Vec2f_t dir = v2f_sub(unmodEnd, unmodStart);
+		*end = v2f_add(unmodStart, v2f_mul(dir, t));
 		*endT = t;
 
 	} else if (rDotEnd < 0.0f) {
 		//End is NOT in the view already, should modify.
 		float t = rDotStart / (rDotStart - rDotEnd);
-		Vec2f_t dir = v2f_sub(*end, *start);
-		*end = v2f_add(*start, v2f_mul(dir, t));
+		Vec2f_t dir = v2f_sub(unmodEnd, unmodStart);
+		*end = v2f_add(unmodStart, v2f_mul(dir, t));
 		*endT = t;
 	}
 
@@ -531,7 +531,7 @@ void r_drawLineDef(const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t
 	//Draw, interpolating.
 	float aspectRatio = (float)(resolution.x) / (float)(resolution.y);
 	float textureX = 0.0f;
-	for (int screenX=leftMostClamp; screenX<rightMostClamp; screenX++) {
+	for (int screenX=leftMostClamp; screenX<=rightMostClamp; screenX++) {
 		float interp = (float)(screenX - leftMost) / (float)(range);
 		float invDistance = MIN(f_lerp(lInvDepth, rInvDepth, interp), 1.0f / NEAR_PLANE);
 		float depthF = 1.0f / invDistance;
@@ -562,19 +562,18 @@ float r_getLineDefDistance(const LineDef_t* thisLineDef) {
 	Vec2f_t start = g_vertices[thisLineDef->vStart];
 	Vec2f_t end = g_vertices[thisLineDef->vEnd];
 
-	Vec2f_t delta = v2f_sub(end, start);
-	float lengthSQ = v2f_lenSQ(delta);
-	Vec2f_t direction = v2f_div(delta, sqrtf(lengthSQ)); //Normalise
-	float projSQ = v2f_dot(
-		v2f_sub(camera.position, start), direction
-	);
-	float proj = sqrtf(MAX(0.0f, MIN(projSQ, lengthSQ)));
+	Vec2f_t dir = v2f_sub(end, start);
+	float dirLen = v2f_len(dir);
+	dir = v2f_div(dir, dirLen); //Normalise
+	Vec2f_t normal = (Vec2f_t){.x=-dir.y, .y=dir.x};
 
-	Vec2f_t closestPoint = v2f_add(
-		start, v2f_mul(direction, proj)
-	);
+	Vec2f_t delta = v2f_sub(camera.position, start);
+	float projD = v2f_dot(delta, dir);
+	float projN = v2f_dot(delta, normal);
 
-	return v2f_lenSQ(v2f_sub(camera.position, closestPoint));
+	if (projD < 0.0f) {return v2f_len(delta);}
+	else if (projD > dirLen) {return v2f_dist(camera.position, end);}
+	else {return fabsf(projN);}
 }
 
 
@@ -600,7 +599,7 @@ void r_sortLineDefs(
 		if (!(thisLineDef->isValid)) {continue;}
 		(*numValidLineDefs)++;
 		sorts[numSorts++] = (LineDefSort_t){
-			.distance=r_getLineDefDistance(thisLineDef),
+			.distance=fabsf(r_getLineDefDistance(thisLineDef)),
 			.lineDef=thisLineDef
 		};
 	}
