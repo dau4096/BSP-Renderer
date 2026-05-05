@@ -27,6 +27,12 @@ Sector_t g_sectors[MAX_SECTORS]; //Sectors made of LineDefs.
 
 
 
+//////// CONSTANTS ////////
+#define EPSILON 1.0e-3f
+#define NEAR_PLANE 1.0e-3f
+//////// CONSTANTS ////////
+
+
 
 //////// COLUMN DATA ////////
 typedef uint8_t Depth_t;
@@ -370,10 +376,90 @@ void r_drawPortalColumn(
 
 
 
+
+int r_clipLDVertices(Vec2f_t* start, Vec2f_t* end, float* startT, float* endT) {
+	//Clip to the "View frustum" in 2D.
+	//If it's out of the view entirely, return FALSE.
+	Vec2f_t deltaS = v2f_sub(*start, camera.position);
+	Vec2f_t deltaE = v2f_sub(*end, camera.position);
+
+	//Bounds of the view.
+	float lYaw = camera.yaw - (camera.FOV / 2.0f);
+	float rYaw = camera.yaw + (camera.FOV / 2.0f);
+
+	Vec2f_t lBound = (Vec2f_t){.x=sin(lYaw), .y=cos(lYaw)};
+	Vec2f_t rBound = (Vec2f_t){.x=sin(rYaw), .y=cos(rYaw)};
+
+
+	//2 "normal vectors" that point toward the view forward. If both vertices fail a dot product > 0 check with these, then they're offscreen.
+	Vec2f_t lNormal = (Vec2f_t){.x=lBound.y, .y=-lBound.x};
+	Vec2f_t rNormal = (Vec2f_t){.x=-rBound.y, .y=rBound.x};
+
+
+	//Left bound checking;
+	float lDotStart = v2f_dot(lNormal, deltaS);
+	float lDotEnd = v2f_dot(lNormal, deltaE);
+	//Right bound checking;
+	float rDotStart = v2f_dot(rNormal, deltaS);
+	float rDotEnd = v2f_dot(rNormal, deltaE);
+
+	if (
+		((lDotStart < -EPSILON) && (lDotEnd < -EPSILON)) || //Left bound checking
+		((rDotStart < -EPSILON) && (rDotEnd < -EPSILON))    //Right bound checking
+	) {
+		//Both vertices are offscreen to one side.
+		return FALSE;
+	}
+
+
+	Vec2f_t ldDelta = v2f_sub(*end, *start);
+	if (lDotStart < 0.0f) {
+		//Start is NOT in the view already, should modify.
+		float t = lDotStart / (lDotStart - lDotEnd);
+		Vec2f_t dir = v2f_sub(*end, *start);
+		*start = v2f_add(*start, v2f_mul(dir, t));
+		*startT = t;
+
+	} else if (rDotStart < 0.0f) {
+		//Start is NOT in the view already, should modify.
+		float t = rDotStart / (rDotStart - rDotEnd);
+		Vec2f_t dir = v2f_sub(*end, *start);
+		*start = v2f_add(*start, v2f_mul(dir, t));
+		*startT = t;
+	}
+
+	if (lDotEnd < 0.0f) {
+		//End is NOT in the view already, should modify.
+		float t = lDotStart / (lDotStart - lDotEnd);
+		Vec2f_t dir = v2f_sub(*end, *start);
+		*end = v2f_add(*start, v2f_mul(dir, t));
+		*endT = t;
+
+	} else if (rDotEnd < 0.0f) {
+		//End is NOT in the view already, should modify.
+		float t = rDotStart / (rDotStart - rDotEnd);
+		Vec2f_t dir = v2f_sub(*end, *start);
+		*end = v2f_add(*start, v2f_mul(dir, t));
+		*endT = t;
+	}
+
+	return TRUE; //In the view.
+}
+
+
+
+
 void r_drawLineDef(const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t* fbPTR) {
 	//Interpolate from start-end along the Segment.
 	Vec2f_t start = g_vertices[thisLineDef->vStart];
 	Vec2f_t end = g_vertices[thisLineDef->vEnd];
+
+
+	//Clip to the camera "frustum" (trapezium in 2D)
+	//Stops projections getting too absurd.
+	float startT = 0.0f, endT = 1.0f;
+	if (!r_clipLDVertices(&start, &end, &startT, &endT)) {return; /* Both vertices are offscreen. */}
+
 
 	float dStart = v2f_dot(camera.forward, v2f_sub(start, camera.position));
 	float dEnd = v2f_dot(camera.forward, v2f_sub(end, camera.position));
@@ -399,18 +485,21 @@ void r_drawLineDef(const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t
 	if (startX == endX) {return; /* Infinitely thin, don't draw. */}
 
 	//Calculate depth
-	float startDepth = v2f_len(v2f_sub(start, camera.position));
-	float endDepth = v2f_len(v2f_sub(end, camera.position));
+	float startDepth = MAX(v2f_dist(start, camera.position), NEAR_PLANE);
+	float endDepth = MAX(v2f_dist(end, camera.position), NEAR_PLANE);
 
 	//Find left/rightmost
 	int leftMost, rightMost;
 	float lInvDepth, rInvDepth;
+	float leftT, rightT;
 	if (startX < endX) {
 		leftMost = startX; lInvDepth = 1.0f / startDepth;
 		rightMost = endX;  rInvDepth = 1.0f / endDepth;
+		leftT = startT; rightT = endT;
 	} else {
 		rightMost = startX; rInvDepth = 1.0f / startDepth;
 		leftMost = endX;    lInvDepth = 1.0f / endDepth;
+		leftT = endT; rightT = startT;
 	}
 	int range = rightMost - leftMost;
 
@@ -443,10 +532,11 @@ void r_drawLineDef(const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t
 	float aspectRatio = (float)(resolution.x) / (float)(resolution.y);
 	float textureX = 0.0f;
 	for (int screenX=leftMostClamp; screenX<rightMostClamp; screenX++) {
-		float t = (float)(screenX - leftMost) / (float)(range);
-		float invDistance = f_lerp(lInvDepth, rInvDepth, t);
+		float interp = (float)(screenX - leftMost) / (float)(range);
+		float invDistance = MIN(f_lerp(lInvDepth, rInvDepth, interp), 1.0f / NEAR_PLANE);
 		float depthF = 1.0f / invDistance;
 
+		float t = f_lerp(leftT, rightT, interp);
 		textureX = (int)(t * (float)(TEXTURE_RESOLUTION.x));
 
 		if (isSolid) {
