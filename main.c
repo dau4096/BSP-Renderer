@@ -34,9 +34,14 @@ double now(void) {
 #endif
 
 
-//Will be used later to add a UI bar at the bottom.
-#define UI_HEIGHT 0u
+#ifdef DEBUG_VALUES
+//Shows generic debug values instead of a UI.
+#define UI_HEIGHT 4u
 
+#else
+//Will be used later to add a UI bar at the bottom.
+#define UI_HEIGHT 5u
+#endif
 
 
 int main(void) {
@@ -109,6 +114,9 @@ int main(void) {
 	#endif
 		fflush(stdout);
 
+	#ifndef SUPPRESS_INTERFACE_OUTPUT
+		ui_drawInterface(tResChars, UI_HEIGHT);
+	#endif
 
 
 		dt = now() - start;

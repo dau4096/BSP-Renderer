@@ -6,7 +6,7 @@ SHARED_FLAGS = -DCOLOUR_QUANTISATION -DLIMITED_FREQ
 DEBUG_FLAGS =  -g -DDEBUG -DDEBUG_VALUES #-DDEBUG_BORDERS #-DSUPPRESS_FRAMEBUFFER_OUTPUT
 RELEASE_FLAGS =  -O3 -ffast-math  -march=native
 
-SOURCES = main.c src/terminal.c src/io.c src/graphics.c src/physics.c
+SOURCES = main.c src/graphics.c src/terminal.c src/physics.c src/io.c src/ui.c
 OBJECTS = $(SOURCES:.c=.o)
 BINFILE = prgm.x86_64
 
