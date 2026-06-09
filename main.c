@@ -16,7 +16,7 @@
 
 volatile sig_atomic_t run = 1;
 void signalHandler(int sig) {
-	//^C interrupt caught. Temporary fix for no IO.
+	//^C interrupt caught. Fallback for no IO.
 	run = 0;
 }
 

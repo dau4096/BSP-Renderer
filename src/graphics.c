@@ -378,69 +378,85 @@ void r_drawPortalColumn(
 
 
 int r_clipLDVertices(Vec2f_t* start, Vec2f_t* end, float* startT, float* endT) {
-	//Clip to the "View frustum" in 2D.
+	//Clip to the "View frustum" in 2D. (View trapezium, really.)
 	//If it's out of the view entirely, return FALSE.
-	Vec2f_t deltaS = v2f_sub(*start, camera.position);
-	Vec2f_t deltaE = v2f_sub(*end, camera.position);
+	
+	float leftAngle = camera.yaw - (camera.FOV * 0.5f);
+	Vec2f_t leftDirection = (Vec2f_t){.x=sin(leftAngle), .y=cos(leftAngle)}; //Points direction of leftside of screen.
+	Vec2f_t leftNormal = (Vec2f_t){.x=leftDirection.y, .y=-leftDirection.x}; //Rotate CW to face into view. Positive values means RIGHT of leftmost edge.
 
-	//Bounds of the view.
-	float lYaw = camera.yaw - (camera.FOV / 2.0f);
-	float rYaw = camera.yaw + (camera.FOV / 2.0f);
-
-	Vec2f_t lBound = (Vec2f_t){.x=sin(lYaw), .y=cos(lYaw)};
-	Vec2f_t rBound = (Vec2f_t){.x=sin(rYaw), .y=cos(rYaw)};
-
-
-	//2 "normal vectors" that point toward the view forward. If both vertices fail a dot product > 0 check with these, then they're offscreen.
-	Vec2f_t lNormal = (Vec2f_t){.x=lBound.y, .y=-lBound.x};
-	Vec2f_t rNormal = (Vec2f_t){.x=-rBound.y, .y=rBound.x};
+	float rightAngle = camera.yaw + (camera.FOV * 0.5f);
+	Vec2f_t rightDirection = (Vec2f_t){.x=sin(rightAngle), .y=cos(rightAngle)}; //Points direction of rightside of screen.
+	Vec2f_t rightNormal = (Vec2f_t){.x=-rightDirection.y, .y=rightDirection.x}; //Rotate ACW to face into view. Positive values means LEFT of rightmost edge.
 
 
-	//Left bound checking;
-	float lDotStart = v2f_dot(lNormal, deltaS);
-	float lDotEnd = v2f_dot(lNormal, deltaE);
-	//Right bound checking;
-	float rDotStart = v2f_dot(rNormal, deltaS);
-	float rDotEnd = v2f_dot(rNormal, deltaE);
+	Vec2f_t deltaStart = v2f_sub(*start, camera.position);
+	Vec2f_t deltaEnd = v2f_sub(*end, camera.position);
+
+	float leftDotStart = v2f_dot(leftNormal, deltaStart);
+	float leftDotEnd = v2f_dot(leftNormal, deltaEnd);
+
+	float rightDotStart = v2f_dot(rightNormal, deltaStart);
+	float rightDotEnd = v2f_dot(rightNormal, deltaEnd);
+
+	float forwardDotStart = v2f_dot(camera.forward, deltaStart);
+	float forwardDotEnd = v2f_dot(camera.forward, deltaEnd);
 
 	if (
-		((lDotStart < -EPSILON) && (lDotEnd < -EPSILON)) || //Left bound checking
-		((rDotStart < -EPSILON) && (rDotEnd < -EPSILON))    //Right bound checking
+		((leftDotStart < 0.0f) && (leftDotEnd < 0.0f)) || //Left
+		((rightDotStart < 0.0f) && (rightDotEnd < 0.0f)) || //Right
+		((forwardDotStart < 0.0f) && (forwardDotEnd < 0.0f))  //Behind
 	) {
-		//Both vertices are offscreen to one side.
+		//Outside of view - Entirely offscreen left, right, or behind.
 		return FALSE;
 	}
 
 
-	Vec2f_t unmodStart = *start, unmodEnd = *end;
-	if (lDotStart < 0.0f) {
-		//Start is NOT in the view already, should modify.
-		float t = lDotStart / (lDotStart - lDotEnd);
-		Vec2f_t dir = v2f_sub(unmodEnd, unmodStart);
-		*start = v2f_add(unmodStart, v2f_mul(dir, t));
-		*startT = t;
-
-	} else if (rDotStart < 0.0f) {
-		//Start is NOT in the view already, should modify.
-		float t = rDotStart / (rDotStart - rDotEnd);
-		Vec2f_t dir = v2f_sub(unmodEnd, unmodStart);
-		*start = v2f_add(unmodStart, v2f_mul(dir, t));
-		*startT = t;
+	if (
+		(leftDotStart >= 0.0f) && (rightDotStart >= 0.0f) && 
+		(leftDotEnd >= 0.0f) && (rightDotEnd >= 0.0f)
+	) {
+		//Both are in the view, exit early.
+		*startT = 0.0f;
+		*endT = 1.0f;
+		return TRUE;
 	}
 
-	if (lDotEnd < 0.0f) {
-		//End is NOT in the view already, should modify.
-		float t = lDotStart / (lDotStart - lDotEnd);
-		Vec2f_t dir = v2f_sub(unmodEnd, unmodStart);
-		*end = v2f_add(unmodStart, v2f_mul(dir, t));
-		*endT = t;
 
-	} else if (rDotEnd < 0.0f) {
-		//End is NOT in the view already, should modify.
-		float t = rDotStart / (rDotStart - rDotEnd);
-		Vec2f_t dir = v2f_sub(unmodEnd, unmodStart);
-		*end = v2f_add(unmodStart, v2f_mul(dir, t));
-		*endT = t;
+	Vec2f_t originalStart = *start;
+	Vec2f_t originalEnd = *end;
+	Vec2f_t originalDelta = v2f_sub(*end, *start);
+	
+
+	//Handle start clipping.
+	if (leftDotStart < 0.0f) {
+		//Start is offscreen to the left
+		float t = (-leftDotStart) / (fabsf(leftDotEnd) + fabsf(leftDotStart));
+		*start = v2f_add(originalStart, v2f_mul(originalDelta, t));
+		*startT = t;
+
+	} else if (rightDotStart < 0.0f) {
+		//Start is offscreen to the right (Cannot be both - Would be behind camera and so have exited by this point.)
+		float t = (-rightDotStart) / (fabsf(rightDotEnd) + fabsf(rightDotStart));
+		*start = v2f_add(originalStart, v2f_mul(originalDelta, t));
+		*startT = t;
+
+	}
+
+	//Handle end clipping.
+	if (leftDotEnd < 0.0f) {
+		//End is offscreen to the left
+		float t = (-leftDotEnd) / (fabsf(leftDotStart) + fabsf(leftDotEnd));
+		*end = v2f_sub(originalEnd, v2f_mul(originalDelta, t));
+		*endT = 1.0f - t;
+
+	}
+	if (rightDotEnd < 0.0f) {
+		//End is offscreen to the right
+		float t = (-rightDotEnd) / (fabsf(rightDotStart) + fabsf(rightDotEnd));
+		*end = v2f_sub(originalEnd, v2f_mul(originalDelta, t));
+		*endT = 1.0f - t;
+
 	}
 
 	return TRUE; //In the view.
@@ -467,16 +483,7 @@ void r_drawLineDef(const LineDef_t* thisLineDef, const Vec2i_t resolution, RGB_t
 	Vec2f_t normal = (Vec2f_t){.x=-dir.y, .y=dir.x};
 
 	if ((dStart < 0.0f) && (dEnd < 0.0f)) {return;}
-
-	//If one point is behind, clip it.
-	if ((dStart < 0.0f) || (dEnd < 0.0f)) {
-	    float t = dStart / (dStart - dEnd);
-
-	    Vec2f_t clipPoint = v2f_add(start, v2f_mul(dir, t));
-
-	    if (dStart < 0.0f) {start = clipPoint;}
-	    else {end = clipPoint;}
-	}
+	
 
 
 	//Project into screen horizontally
