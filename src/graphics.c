@@ -56,7 +56,7 @@ void r_reallocColumnBuffers(const int width) {
 void r_clearColumnBuffers(const Vec2i_t resolution) {
 	memset(lowYMap, (unsigned int)(0x00u), resolution.x * sizeof(Depth_t)); //Reset to all 0x00 (0px, bottom of the screen) values.
 	memset(depthMap, (Depth_t)(0xFFu), resolution.x * sizeof(Depth_t)); //Reset to all 0xFF (255, max depth) values.
-	for (unsigned int* ptr=topYMap; ptr<(topYMap+resolution.x); ptr++) {*ptr = resolution.y-1; /* Set to all [resY] values. */}
+	for (unsigned int* ptr=topYMap; ptr<(topYMap+resolution.x); ptr++) {*ptr = resolution.y; /* Set to all [resY] values. */}
 }
 
 

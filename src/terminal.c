@@ -169,7 +169,7 @@ void t_drawFramebuffer(void) {
 	RGB_t lowPrev = RGB_BLACK;
 	int hasReset = TRUE; ///May not be accurate, force a colour change.
 
-    for (uint y=HEIGHT; y>0u; y-=2u) {
+    for (uint y=HEIGHT-2; y>0u; y-=2u) {
         for (uint x=0u; x<WIDTH; x++) {
 
             int topIndex = (y * WIDTH) + x;
