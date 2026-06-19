@@ -229,26 +229,24 @@ void p_updateCamera(Camera_t* camera, double dt) {
 	printf("Start: (%f, %f), End: (%f, %f)\n", motion.start.x, motion.start.y, motion.end.x, motion.end.y);
 #endif
 
+
 	//Check Z against ceiling/floor of the sector.
 	camera->Z += camera->Zvelocity;
 	float cameraFootZ = camera->Z + CAMERA_FEET_OFFSET;
 	float cameraHeadZ = camera->Z + CAMERA_HEAD_OFFSET;
 
-	if (cameraHeadZ > thisSector->ceilingHeight) {
-		//Reset vertical vel, move down.
-		camera->Z = thisSector->ceilingHeight - CAMERA_HEAD_OFFSET;
-		camera->Zvelocity = 0.0f;
-	}
-
-	if ((cameraFootZ < thisSector->floorHeight) && (!isOnFloor)) {
-		//Reset vertical vel, move up.
+	isOnFloor = FALSE; //Auto-reset every tick, overwritten when on floor.
+	printf("%i %i\n", (cameraFootZ <= thisSector->floorHeight), (cameraHeadZ >= thisSector->ceilingHeight));
+	if (cameraFootZ <= thisSector->floorHeight) {
 		isOnFloor = TRUE;
-		camera->Z = thisSector->floorHeight - CAMERA_FEET_OFFSET;
+		camera->Z = thisSector->floorHeight - CAMERA_FEET_OFFSET; //Inverse offset to go feet→camera
 		camera->Zvelocity = 0.0f;
-	} else if (cameraFootZ >= thisSector->floorHeight) {
-		//Is not in the roof or floor, apply gravity.
-		isOnFloor = FALSE;
-		camera->Zvelocity += GRAVITY * dt;
+
+	} else if (cameraHeadZ > thisSector->ceilingHeight) {
+		if (camera->Zvelocity > 0.0f) {camera->Zvelocity = 0.0f;}
+		camera->Z = thisSector->ceilingHeight - CAMERA_HEAD_OFFSET * 1.01f; //Inverse offset to go head→camera, slightly further to prevent getting stuck.
+
 	}
+	camera->Zvelocity += (float)(GRAVITY) * (float)(dt);
 }
 
