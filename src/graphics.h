@@ -6,18 +6,20 @@
 
 
 //////// DATA ////////
-extern Camera_t camera;
+#define MAX_TEXTURES 64u
 
+
+extern Camera_t* r_camera;
 
 
 //Placeholder values; replace with calloc() heap stuff later.
-#define MAX_VERTICES 64u
-#define MAX_LINEDEFS 32u
-#define MAX_SECTORS  16u
+extern unsigned int g_numVertices;
+extern unsigned int g_numLineDefs;
+extern unsigned int g_numSectors;
 
-extern Vec2f_t g_vertices[MAX_VERTICES];
-extern LineDef_t g_lineDefs[MAX_LINEDEFS];
-extern Sector_t g_sectors[MAX_SECTORS];
+extern Vec2f_t* g_vertices;
+extern LineDef_t* g_lineDefs;
+extern Sector_t* g_sectors;
 //////// DATA ////////
 
 
@@ -35,8 +37,7 @@ void r_drawFrame(const Vec2i_t resolution);
 
 //////// INITIALISATION ////////
 void r_initCamera(void);
-int r_loadTextures(void);
-void r_createGeometry(void);
+int r_loadTextures(const char** textureNames, const unsigned int numTexturePaths);
 //////// INITIALISATION ////////
 
 

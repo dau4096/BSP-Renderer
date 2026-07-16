@@ -1,0 +1,247 @@
+/* loader.c */
+
+#include <stdio.h>
+#include <string.h>
+#include <libxml/parser.h>
+#include <libxml/tree.h>
+
+
+#include "types.h"
+#include "graphics.h" //For the geometry datasets
+
+
+
+
+static xmlNode* l_findChildNode(const xmlNode* parent, const char* name) {
+	for (xmlNode* node=parent->children; node; node=node->next) {
+		if (
+			(node->type == XML_ELEMENT_NODE) &&
+			(xmlStrEqual(node->name, BAD_CAST name))
+		) {
+			return node;
+		}
+	}
+	return NULL;
+}
+
+static unsigned int l_getNumChildElements(const xmlNode* parent) {
+	unsigned int count = 0u;
+	for (xmlNode* child=parent->children; child; child=child->next) {
+		if (child->type == XML_ELEMENT_NODE) {count++;}
+	}
+	return count;
+}
+
+
+
+
+
+static const char* l_getStrAttr(const xmlNode* node, const char* name) {
+    xmlChar* value = xmlGetProp(node, BAD_CAST name);
+    if (!value) {return NULL;}
+
+    char* copy = strdup((const char*)(value));
+    xmlFree(value);
+    return copy;
+}
+
+static int l_getIntAttr(const xmlNode* node, const char* name) {
+	xmlChar* value = xmlGetProp(node, BAD_CAST name);
+	int result = (int)(strtol((const char*)(value), NULL, 10)); //Accept decimal only
+	xmlFree(value);
+	return result;
+}
+
+static unsigned int l_getUIntAttr(const xmlNode* node, const char* name) {
+	xmlChar* value = xmlGetProp(node, BAD_CAST name);
+	int result = (unsigned int)(strtoul((const char*)(value), NULL, 0)); //Accept decimal and hexadecimal.
+	xmlFree(value);
+	return result;
+}
+
+static float l_getFloatAttr(const xmlNode* node, const char* name) {
+	xmlChar* value = xmlGetProp(node, BAD_CAST name);
+	float result = strtof((const char*)(value), NULL);
+	xmlFree(value);
+	return result;
+}
+
+static RGB_t l_getColourAttr(const xmlNode* node, const char* name) {
+	const char* strAttr = l_getStrAttr(node, name);
+
+	//Parse individually as R/G/B hex.
+	unsigned int r, g, b;
+	sscanf(strAttr, "%2x%2x%2x", &r, &g, &b);
+
+	return (RGB_t) { //TBA
+		.r = (uint8_t)(r),
+		.g = (uint8_t)(g),
+		.b = (uint8_t)(b)
+	};
+}
+
+static unsigned int l_countUInts(const char* strAttr) {
+    unsigned int count = 0;
+    char* end;
+
+    while (*strAttr) {
+        strtoul(strAttr, &end, 10);
+
+        if (strAttr == end) {break;}
+
+        count++;
+        strAttr = end;
+    }
+
+    return count;
+}
+
+static void l_getLineDefsArrayAttr(const xmlNode* node, unsigned int** lineDefsArr, unsigned int* numLineDefs) {
+	const char* strAttr = l_getStrAttr(node, "lineDefs");
+	char *end;
+	*numLineDefs = l_countUInts(strAttr);
+	*lineDefsArr = (unsigned int*)calloc(*numLineDefs, sizeof(unsigned int));
+
+	unsigned int* ptr = *lineDefsArr;
+	while (*strAttr) {
+		unsigned long value = strtoul(strAttr, &end, 10);
+		if (strAttr == end) {break; /* no more numbers */}
+
+		*(ptr++) = (unsigned)(value);
+
+		strAttr = end;
+	}
+}
+
+
+unsigned int numAssignedTextures;
+const char* textureNames[MAX_TEXTURES];
+static unsigned int l_assignTextureIndex(const char* filePath) {
+	for (unsigned int i=0u; i<numAssignedTextures; i++) {
+		//Check if it's already in the dataset. If so, return the index.
+		if (strcmp(textureNames[i], filePath) == 0) {return i; /* Found */}
+	}
+
+	//Didn't find it, add to the end of the list.
+	textureNames[numAssignedTextures] = filePath;
+	return numAssignedTextures++;
+}
+
+
+
+
+
+void l_getVertices(const xmlNode* root) {
+	const xmlNode* verticesNode = l_findChildNode(root, "vertices");
+	g_numVertices = l_getNumChildElements(verticesNode);
+	g_vertices = calloc(g_numVertices, sizeof(Vec2f_t));
+
+	//Parse each in order.
+	Vec2f_t* geoIndex = g_vertices; //Moving ptr
+	for (xmlNode* vertNode=verticesNode->children; vertNode; vertNode=vertNode->next) {
+		*(geoIndex++) = (Vec2f_t){
+			.x=l_getFloatAttr(vertNode, "x"),
+			.y=l_getFloatAttr(vertNode, "y")
+		};
+	}
+}
+
+
+
+
+void l_getSectors(const xmlNode* root) {
+	const xmlNode* sectorsNode = l_findChildNode(root, "sectors");
+	g_numSectors = l_getNumChildElements(sectorsNode);
+	g_sectors = calloc(g_numSectors, sizeof(Sector_t));
+
+	//Parse each in order.
+	Sector_t* geoIndex = g_sectors; //Moving ptr
+	for (xmlNode* secNode=sectorsNode->children; secNode; secNode=secNode->next) {
+		unsigned int* lineDefsArr; unsigned int numLineDefs;
+		l_getLineDefsArrayAttr(secNode, &lineDefsArr, &numLineDefs);
+
+		*(geoIndex++) = (Sector_t){
+			.floorHeight=l_getFloatAttr(secNode, "floorZ"),
+			.floorColour=l_getColourAttr(secNode, "floorC"),
+
+			.ceilingHeight=l_getFloatAttr(secNode, "ceilZ"),
+			.ceilingColour=l_getColourAttr(secNode, "ceilC"),
+
+			.lineDefs=lineDefsArr, .numLineDefs=numLineDefs,
+			.lightLevel=l_getUIntAttr(secNode, "lightLevel")
+		};
+	}
+}
+
+
+
+
+void l_getLineDefs(const xmlNode* root) {
+	//Assumes sectors & vertices have been processed first.
+	const xmlNode* lineDefsNode = l_findChildNode(root, "lineDefs");
+	g_numLineDefs = l_getNumChildElements(lineDefsNode);
+	g_lineDefs = calloc(g_numLineDefs, sizeof(LineDef_t));
+
+	//Parse each in order.
+	LineDef_t* geoIndex = g_lineDefs; //Moving ptr
+	for (xmlNode* ldNode=lineDefsNode->children; ldNode; ldNode=ldNode->next) {
+		const char* textureName = l_getStrAttr(ldNode, "texture");
+		unsigned int textureIndex = l_assignTextureIndex(textureName);
+		*(geoIndex++) = (LineDef_t){
+			.vStart=l_getUIntAttr(ldNode, "v0"),
+			.vEnd=l_getUIntAttr(ldNode, "v1"),
+
+			.frontSector=l_getIntAttr(ldNode, "front"), //Eventually replace with autogenerated from sectors (?)
+			.backSector=l_getIntAttr(ldNode, "back"),   //Ditto [^^]
+
+			.texture=textureIndex,
+			.isValid=TRUE 
+		};
+	}
+}
+
+
+
+
+int l_loadGeo(const char* filePath) {
+	//Loads some file into the geometry datasets provided.
+	//Returns success
+
+	//Deallocate if already filled.
+	if (g_vertices) {free(g_vertices);}
+	if (g_lineDefs) {free(g_lineDefs);}
+	if (g_sectors) {free(g_sectors);}
+
+
+	numAssignedTextures = 0u;
+
+
+	//Read the file
+	xmlDocPtr document = xmlReadFile(filePath, NULL, XML_PARSE_NOBLANKS);
+	if (!document) {
+		//Failed to load document.
+		return FALSE;
+	}
+
+
+	xmlNode* root = xmlDocGetRootElement(document);
+
+
+	//Parse 
+	l_getVertices(root);
+	l_getSectors(root);
+	l_getLineDefs(root); //Front/back sectors depends on processing sectors first
+
+
+	//Load all textures;
+	r_loadTextures(textureNames, numAssignedTextures);
+
+
+	//Cleanup
+	xmlFreeDoc(document);
+
+	return TRUE;
+}
+
+
+

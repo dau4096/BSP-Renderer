@@ -16,13 +16,17 @@
 
 
 //////// DATA ////////
-//Temporary, while camera is in 2D.
 Camera_t camera; //The view
+Camera_t* r_camera = &camera; //Ptr to ^^
 
 
-Vec2f_t g_vertices[MAX_VERTICES]; //2D positions.
-LineDef_t g_lineDefs[MAX_LINEDEFS]; //LineDefs connecting vertices.
-Sector_t g_sectors[MAX_SECTORS]; //Sectors made of LineDefs.
+unsigned int g_numVertices;
+unsigned int g_numLineDefs;
+unsigned int g_numSectors;
+
+Vec2f_t* g_vertices; //2D positions.
+LineDef_t* g_lineDefs; //LineDefs connecting vertices.
+Sector_t* g_sectors; //Sectors made of LineDefs.
 //////// DATA ////////
 
 
@@ -84,9 +88,6 @@ int r_manageColumnValues(unsigned int x, unsigned int* lowYBound, unsigned int* 
 
 //////// TEXTURES ////////
 #define TEXTURE_RESOLUTION ((Vec2i_t){.x=32, .y=32})
-#define MAX_TEXTURES 8
-
-unsigned int numValidTextures;
 RGB_t* textures[MAX_TEXTURES]; //Stores texture data. Each entry is a 32×32 grid of pixel data (1D) organised by columns ([(x * 32) + y])
 
 
@@ -128,8 +129,10 @@ int r_loadTexture(const char* path, RGB_t** pixels) { //Returns success
 }
 
 
-int r_getColumn(unsigned int ID, const int x, RGB_t** ptr) { //Returns success
+int r_getColumn(const unsigned int ID, int x, RGB_t** ptr) { //Returns success
 	if (ID >= MAX_TEXTURES) {return FALSE; /* Invalid */}
+	if (x < 0) {x = 0;}
+	else if (x >= TEXTURE_RESOLUTION.y) {x = TEXTURE_RESOLUTION.x-1;}
 	*ptr = textures[ID] + (x * TEXTURE_RESOLUTION.y); //Organised in columns, so iterate over this [TEXTURE_RESOLUTION.y] times for a full column.
 	return TRUE;
 }
@@ -598,10 +601,10 @@ void r_sortLineDefs(
 	LineDef_t** result, unsigned int* numValidLineDefs
 ) {
 	//Find LDs nearest to furthest.
-	LineDefSort_t sorts[MAX_LINEDEFS];
+	LineDefSort_t* sorts = calloc(g_numLineDefs, sizeof(LineDefSort_t));
 	unsigned int numSorts = 0u;
 
-	for (unsigned int ldIndex=0u; ldIndex<MAX_LINEDEFS; ldIndex++) {
+	for (unsigned int ldIndex=0u; ldIndex<g_numLineDefs; ldIndex++) {
 		LineDef_t* thisLineDef = g_lineDefs + ldIndex;
 		if (!(thisLineDef->isValid)) {continue;}
 		(*numValidLineDefs)++;
@@ -614,6 +617,8 @@ void r_sortLineDefs(
 	qsort(sorts, numSorts, sizeof(LineDefSort_t), r_compareSorts);
 
 	for (unsigned int sortIndex=0u; sortIndex<numSorts; sortIndex++) {result[sortIndex] = sorts[sortIndex].lineDef;}
+
+	free(sorts);
 }
 
 
@@ -623,7 +628,7 @@ void r_drawFrame(const Vec2i_t resolution) {
 
 
 	//Sort near-to-far.
-	LineDef_t* sortedLineDefs[MAX_LINEDEFS];
+	LineDef_t** sortedLineDefs = calloc(g_numLineDefs, sizeof(LineDef_t*));
 	unsigned int numValidLineDefs = 0u;
 	r_sortLineDefs(sortedLineDefs, &numValidLineDefs);
 
@@ -632,6 +637,8 @@ void r_drawFrame(const Vec2i_t resolution) {
 		LineDef_t* thisLineDef = sortedLineDefs[ldIndex];
 		r_drawLineDef(thisLineDef, resolution, fbPTR);
 	}
+
+	free(sortedLineDefs);
 }
 //////// DRAWING ////////
 
@@ -652,156 +659,20 @@ void r_initCamera(void) {
 }
 
 
-int r_loadTextures(void) {
-	const unsigned char* texturePaths[] = {
-		"textures/uv.png", "textures/fallback.png"
-	};
-	unsigned int numTexturePaths = sizeof(texturePaths) / sizeof(texturePaths[0]);
-
-	numValidTextures = 0u;
+int r_loadTextures(const char** texturePaths, const unsigned int numTexturePaths) {
+	unsigned int numValidTextures = 0u;
 	for (unsigned int i=0u; i<numTexturePaths; i++) {
-		const unsigned char* path = texturePaths[i];
+		const char* path = texturePaths[i];
 
 		RGB_t* pixelData;
 		if (!r_loadTexture(path, &pixelData)) {printf("Failed to load [%s]\n", path); return FALSE; /* Failed to load texture */}
 
-		textures[numValidTextures++] = pixelData;
+		textures[i] = pixelData;
 		printf("Loaded [%s] successfully.\n", path);
 	}
 
 	return TRUE; //Success
 }
-
-
-
-void r_createGeometry(void) {
-	g_vertices[0] = (Vec2f_t){.x=-10.0f, .y= 10.0f};
-	g_vertices[1] = (Vec2f_t){.x= 10.0f, .y= 10.0f};
-	g_vertices[2] = (Vec2f_t){.x= 15.0f, .y=-10.0f};
-	g_vertices[3] = (Vec2f_t){.x=-17.5f, .y=-10.0f};
-	g_vertices[4] = (Vec2f_t){.x=-20.0f, .y=  0.0f};
-	g_vertices[5] = (Vec2f_t){.x=-30.0f, .y=-10.0f};
-	g_vertices[6] = (Vec2f_t){.x=-25.0f, .y=  0.0f};
-	g_vertices[7] = (Vec2f_t){.x= 15.0f, .y= 10.0f};
-
-
-
-	g_lineDefs[0] = (LineDef_t){
-		.vStart=0, .vEnd=1,
-		.frontSector=0, .backSector=-1,
-		.texture=0u,
-		.isValid=TRUE
-	};
-
-	g_lineDefs[1] = (LineDef_t){
-		.vStart=1, .vEnd=2,
-		.frontSector=2, .backSector=0,
-		.texture=0u,
-		.isValid=TRUE
-	};
-
-	g_lineDefs[2] = (LineDef_t){
-		.vStart=2, .vEnd=3,
-		.frontSector=0, .backSector=-1,
-		.texture=0u,
-		.isValid=TRUE
-	};
-
-	g_lineDefs[3] = (LineDef_t){
-		.vStart=3, .vEnd=4,
-		.frontSector=1, .backSector=0,
-		.texture=0u,
-		.isValid=TRUE
-	};
-
-	g_lineDefs[4] = (LineDef_t){
-		.vStart=4, .vEnd=0,
-		.frontSector=0, .backSector=-1,
-		.texture=0u,
-		.isValid=TRUE
-	};
-
-	g_lineDefs[5] = (LineDef_t){
-		.vStart=3, .vEnd=5,
-		.frontSector=1, .backSector=-1,
-		.texture=0u,
-		.isValid=TRUE
-	};
-
-	g_lineDefs[6] = (LineDef_t){
-		.vStart=5, .vEnd=6,
-		.frontSector=1, .backSector=-1,
-		.texture=0u,
-		.isValid=TRUE
-	};
-
-	g_lineDefs[7] = (LineDef_t){
-		.vStart=6, .vEnd=4,
-		.frontSector=1, .backSector=-1,
-		.texture=0u,
-		.isValid=TRUE
-	};
-
-	g_lineDefs[8] = (LineDef_t){
-		.vStart=1, .vEnd=7,
-		.frontSector=2, .backSector=-1,
-		.texture=0u,
-		.isValid=TRUE
-	};
-
-	g_lineDefs[9] = (LineDef_t){
-		.vStart=7, .vEnd=2,
-		.frontSector=2, .backSector=-1,
-		.texture=0u,
-		.isValid=TRUE
-	};
-
-
-
-	unsigned int* ldIndicesSector0;
-	ldIndicesSector0 = calloc(5, sizeof(unsigned int));
-	ldIndicesSector0[0] = 0;
-	ldIndicesSector0[1] = 1;
-	ldIndicesSector0[2] = 2;
-	ldIndicesSector0[3] = 3;
-	ldIndicesSector0[4] = 4;
-	g_sectors[0] = (Sector_t){
-		.floorHeight=-2.0f, .floorColour=RGB_RED,
-		.ceilingHeight=2.0f, .ceilingColour=RGB_MAGENTA,
-		.lineDefs=ldIndicesSector0, .numLineDefs=5,
-		.lightLevel=127u
-	};
-
-
-
-	unsigned int* ldIndicesSector1;
-	ldIndicesSector1 = calloc(4, sizeof(unsigned int));
-	ldIndicesSector1[0] = 3;
-	ldIndicesSector1[1] = 5;
-	ldIndicesSector1[2] = 6;
-	ldIndicesSector1[3] = 7;
-	g_sectors[1] = (Sector_t){
-		.floorHeight=-2.25f, .floorColour=RGB_BLUE,
-		.ceilingHeight=5.0f, .ceilingColour=RGB_CYAN,
-		.lineDefs=ldIndicesSector1, .numLineDefs=4,
-		.lightLevel=32u
-	};
-
-
-
-	unsigned int* ldIndicesSector2;
-	ldIndicesSector2 = calloc(3, sizeof(unsigned int));
-	ldIndicesSector2[0] = 1;
-	ldIndicesSector2[1] = 8;
-	ldIndicesSector2[2] = 9;
-	g_sectors[2] = (Sector_t){
-		.floorHeight=-0.5f, .floorColour=RGB_GREEN,
-		.ceilingHeight=0.5f, .ceilingColour=RGB_YELLOW,
-		.lineDefs=ldIndicesSector2, .numLineDefs=3,
-		.lightLevel=255u
-	};
-}
-
 //////// INITIALISATION ////////
 
 

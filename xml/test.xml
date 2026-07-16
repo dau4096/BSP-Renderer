@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- generic.xml -->
+
+
+<geometry>
+
+	<vertices>
+		<vertex x="-10.0" y=" 10.0" />
+		<vertex x=" 10.0" y=" 10.0" />
+		<vertex x=" 15.0" y="-10.0" />
+		<vertex x="-17.5" y="-10.0" />
+		<vertex x="-20.0" y="  0.0" />
+		<vertex x="-30.0" y="-10.0" />
+		<vertex x="-25.0" y="  0.0" />
+		<vertex x=" 15.0" y=" 10.0" />
+	</vertices>
+
+
+
+	<lineDefs>
+		<lineDef v0="0" v1="1" front="0" back="-1" texture="textures/uv.png" />
+		<lineDef v0="1" v1="2" front="2" back="0" texture="textures/uv.png" />
+		<lineDef v0="2" v1="3" front="0" back="-1" texture="textures/uv.png" />
+		<lineDef v0="3" v1="4" front="1" back="0" texture="textures/uv.png" />
+		<lineDef v0="4" v1="0" front="0" back="-1" texture="textures/uv.png" />
+		<lineDef v0="3" v1="5" front="1" back="-1" texture="textures/uv.png" />
+		<lineDef v0="5" v1="6" front="1" back="-1" texture="textures/uv.png" />
+		<lineDef v0="6" v1="4" front="1" back="-1" texture="textures/uv.png" />
+		<lineDef v0="1" v1="7" front="2" back="-1" texture="textures/uv.png" />
+		<lineDef v0="7" v1="2" front="2" back="-1" texture="textures/uv.png" />
+	</lineDefs>
+
+
+
+	<sectors>
+		<sector floorZ="-2.0" floorC="FF0000" ceilZ="2.0" ceilC="FF00FF" lineDefs="0 1 2 3 4" lightLevel="127" />
+		<sector floorZ="-2.25" floorC="0000FF" ceilZ="5.0" ceilC="00FFFF" lineDefs="3 5 6 7" lightLevel="32" />
+		<sector floorZ="-0.5" floorC="00FF00" ceilZ="0.5" ceilC="FFFF00" lineDefs="1 8 9" lightLevel="255" />
+	</sectors>
+
+</geometry>

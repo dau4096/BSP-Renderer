@@ -10,6 +10,7 @@
 #include "src/io.h"
 #include "src/graphics.h"
 #include "src/physics.h"
+#include "src/loader.h"
 
 
 
@@ -63,17 +64,21 @@ int main(void) {
 		return -1;
 	}
 
-	int texturesSuccess = r_loadTextures();
-	if (!texturesSuccess) {
-		//Failed to find valid keyboard.
-		printf("Failed to load texture data.\n");
+
+	r_initCamera();
+	int loadXMLSuccess = l_loadGeo("xml/test.xml");
+	if (!loadXMLSuccess) {
+		//Failed to read an XML file properly
+		printf("Failed to read XML file.\n");
 		io_quit();
 		t_deleteFramebuffer();
 		return -1;
 	}
 
-	r_initCamera();
-	r_createGeometry();
+
+
+
+
 
 
 	double start;
@@ -100,9 +105,9 @@ int main(void) {
 
 		//Tasks for this frame;
 	#ifdef LIMITED_FREQ
-		p_updateCamera(&camera, DT);
+		p_updateCamera(r_camera, DT);
 	#else
-		p_updateCamera(&camera, dt);
+		p_updateCamera(r_camera, dt);
 	#endif
 
 		//Render frame
