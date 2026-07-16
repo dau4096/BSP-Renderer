@@ -50,10 +50,10 @@ int io_init(void) {
 		struct udev_device* dev = udev_device_new_from_syspath(udev, path);
 
 		const char* devnode = udev_device_get_devnode(dev);
-		if (!devnode) { continue; }
+		if (!devnode) {continue;}
 
 		int fd = open(devnode, O_RDONLY | O_NONBLOCK);
-		if (fd < 0) { continue; }
+		if (fd < 0) {continue;}
 
 		unsigned long evbits[(EV_MAX + 7) / 8];
 		memset(evbits, 0, sizeof(evbits));
@@ -84,6 +84,7 @@ int io_init(void) {
 			close(fd);
 			break;
 		}
+		udev_device_unref(dev);
 	}
 	if (!found) {return 0; /* Faliure. */}
 

@@ -24,14 +24,14 @@ extern Sector_t* g_sectors;
 
 
 //////// DEPTH MAPPING ////////
-void r_reallocColumnBuffers(const int width);
+void r_reallocColumnBuffers(void);
 //////// DEPTH MAPPING ////////
 
 
 //////// DRAWING ////////
-int r_getCentreX(const Vec2f_t position, const Vec2i_t resolution);
+int r_getCentreX(const Vec2f_t position);
 
-void r_drawFrame(const Vec2i_t resolution);
+void r_drawFrame(void);
 //////// DRAWING ////////
 
 

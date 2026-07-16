@@ -61,6 +61,7 @@ void t_createFramebuffer(const Vec2i_t resolution) {
 	framebuffer.resolution = resolution;
 	framebuffer.data = calloc((int)(resolution.x * resolution.y), sizeof(RGB_t)); //allocate.
 	framebuffer.valid = (framebuffer.data != NULL);
+	printf("\nreallocated! [%i, %i]\n", framebuffer.resolution.x, framebuffer.resolution.y);
 }
 
 RGB_t* t_getFramebufferPTR(void) {return framebuffer.data;}
@@ -160,7 +161,7 @@ void t_resetCursor(void) {
 void t_drawFramebuffer(void) {
     if (!framebuffer.valid) {return; /* Invalid, Can't show. */}
 
-    size_t bufferSize = (size_t)(WIDTH * (HEIGHT/2 + 1) * 64);
+    size_t bufferSize = (size_t)(framebuffer.resolution.x * (framebuffer.resolution.y/2 + 1) * 64);
     char *buffer = malloc(bufferSize); //Start
     char *out = buffer; //End
 
@@ -169,13 +170,13 @@ void t_drawFramebuffer(void) {
 	RGB_t lowPrev = RGB_BLACK;
 	int hasReset = TRUE; ///May not be accurate, force a colour change.
 
-    for (uint y=HEIGHT-2; y>0u; y-=2u) {
-        for (uint x=0u; x<WIDTH; x++) {
+    for (uint y=framebuffer.resolution.y-2; y>0u; y-=2u) {
+        for (uint x=0u; x<framebuffer.resolution.x; x++) {
 
-            int topIndex = (y * WIDTH) + x;
-            int lowIndex = ((y + 1) * WIDTH) + x;
+            int topIndex = (y * framebuffer.resolution.x) + x;
+            int lowIndex = ((y + 1) * framebuffer.resolution.x) + x;
 
-            RGB_t top = (y + 1 < HEIGHT) ? framebuffer.data[lowIndex] : RGB_BLACK;
+            RGB_t top = (y + 1 < framebuffer.resolution.y) ? framebuffer.data[lowIndex] : RGB_BLACK;
             RGB_t low = framebuffer.data[topIndex];
 
 
