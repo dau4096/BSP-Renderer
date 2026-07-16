@@ -131,8 +131,15 @@ static unsigned int l_assignTextureIndex(const char* filePath) {
 
 
 
-void l_getVertices(const xmlNode* root) {
+int l_getVertices(const xmlNode* root) {
 	const xmlNode* verticesNode = l_findChildNode(root, "vertices");
+	if (!verticesNode) {
+		//Failiure
+		printf("Missing <vertices> XML node.\n");
+		return FALSE;
+	}
+
+
 	g_numVertices = l_getNumChildElements(verticesNode);
 	g_vertices = calloc(g_numVertices, sizeof(Vec2f_t));
 
@@ -144,13 +151,22 @@ void l_getVertices(const xmlNode* root) {
 			.y=l_getFloatAttr(vertNode, "y")
 		};
 	}
+
+	return TRUE;
 }
 
 
 
 
-void l_getSectors(const xmlNode* root) {
+int l_getSectors(const xmlNode* root) {
 	const xmlNode* sectorsNode = l_findChildNode(root, "sectors");
+	if (!sectorsNode) {
+		//Failiure
+		printf("Missing <sectors> XML node.\n");
+		return FALSE;
+	}
+
+
 	g_numSectors = l_getNumChildElements(sectorsNode);
 	g_sectors = calloc(g_numSectors, sizeof(Sector_t));
 
@@ -171,14 +187,23 @@ void l_getSectors(const xmlNode* root) {
 			.lightLevel=l_getUIntAttr(secNode, "lightLevel")
 		};
 	}
+
+	return TRUE;
 }
 
 
 
 
-void l_getLineDefs(const xmlNode* root) {
+int l_getLineDefs(const xmlNode* root) {
 	//Assumes sectors & vertices have been processed first.
 	const xmlNode* lineDefsNode = l_findChildNode(root, "lineDefs");
+	if (!lineDefsNode) {
+		//Failiure
+		printf("Missing <lineDefs> XML node.\n");
+		return FALSE;
+	}
+
+
 	g_numLineDefs = l_getNumChildElements(lineDefsNode);
 	g_lineDefs = calloc(g_numLineDefs, sizeof(LineDef_t));
 
@@ -198,6 +223,33 @@ void l_getLineDefs(const xmlNode* root) {
 			.isValid=TRUE 
 		};
 	}
+
+	return TRUE; //Success
+}
+
+
+
+
+int l_repositionCamera(const xmlNode* root) {
+	//Moves and rotates camera to correct starting position.
+	//Deals with *r_camera ptr.
+	const xmlNode* cameraNode = l_findChildNode(root, "camera");
+	if (!cameraNode) {
+		//Failiure
+		printf("Missing <camera> XML node.\n");
+		return FALSE;
+	}
+
+	r_camera->position.x = l_getFloatAttr(cameraNode, "x");
+	r_camera->position.y = l_getFloatAttr(cameraNode, "y");
+
+	r_camera->yaw = l_getFloatAttr(cameraNode, "yaw");
+
+	//Sector_t * currentSector = p_findCurrentSectorSlow(r_camera);
+	Sector_t* currentSector = g_sectors; //Use g_sectors[0] until I figure out a good method it implement the above.
+	r_camera->Z = currentSector->floorHeight;
+
+	return TRUE; //Success
 }
 
 
@@ -227,10 +279,18 @@ int l_loadGeo(const char* filePath) {
 	xmlNode* root = xmlDocGetRootElement(document);
 
 
-	//Parse 
-	l_getVertices(root);
-	l_getSectors(root);
-	l_getLineDefs(root); //Front/back sectors depends on processing sectors first
+	//Parse in order
+	if (
+		!l_getVertices(root) ||
+		!l_getSectors(root) ||
+		!l_getLineDefs(root) //Front/back sectors depends on processing sectors first
+	) {
+		return FALSE; //Any of those 3 failed.
+	}
+
+
+	//Read camera start information
+	if (!l_repositionCamera(root)) {return FALSE; /* Failiure */}
 
 
 	//Load all textures;

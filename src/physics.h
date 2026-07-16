@@ -14,6 +14,8 @@ extern int isOnFloor;
 
 
 //////// TICK ////////
+Sector_t* p_findCurrentSectorSlow(Camera_t* camera);
+
 void p_updateCamera(Camera_t* camera, double dt);
 //////// TICK ////////
 

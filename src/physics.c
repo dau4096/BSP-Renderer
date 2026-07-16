@@ -27,6 +27,10 @@
 typedef struct {Vec2f_t start, end, delta;} Movement_t; //Contains info about the camera's movement.
 
 
+
+
+
+
 //Check if LD is a portal or a solid wall.
 int p_isLineDefSolid(const LineDef_t* thisLineDef) {return (thisLineDef->frontSector == -1) || (thisLineDef->backSector == -1);}
 
@@ -87,6 +91,15 @@ int p_getLDintersect(LineDef_t* thisLineDef, const Movement_t* motion, float* in
 
 	return FALSE;
 }
+
+
+
+Sector_t* p_findCurrentSectorSlow(Camera_t* camera) {
+	//Find for sure which sector the camera is in.
+	//Slower than the below method of tracking "state", but more certain.
+	//TBA at some point.
+}
+
 
 
 
