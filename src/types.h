@@ -53,17 +53,33 @@ typedef struct {
 } LineDef_t;
 
 typedef struct {
-	float distance;
-	LineDef_t* lineDef;
-} LineDefSort_t;
-
-typedef struct {
 	float floorHeight; RGB_t floorColour; //Floor data
 	float ceilingHeight; RGB_t ceilingColour; //Ceiling data
 	unsigned int* lineDefs;    //Array of IDs to LineDef_t[] array (Like 3D model indices)
 	unsigned int numLineDefs; //Length of ID array [^^].
 	uint8_t lightLevel; //Brightness of the sector, 0-255
 } Sector_t;
+
+
+
+//Rendering only
+typedef struct {
+	float distance;
+	LineDef_t* lineDef;
+} LineDefSort_t;
+
+
+typedef struct {
+	unsigned int row;
+	unsigned int xStart;
+	unsigned int xEnd;
+
+	Sector_t* sector;
+	int isFloor; //Is it using floor data or ceiling data from ^^ ptr.
+
+	int active; //Is this span currently being used or not?
+} PlaneSpan_t;
+
 
 
 
