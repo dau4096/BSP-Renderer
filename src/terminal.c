@@ -16,6 +16,7 @@ Buffer_t framebuffer;
 
 
 
+//////// UTILITY ////////
 #ifndef _WIN32
 //Linux only method.
 #include <sys/ioctl.h>
@@ -47,8 +48,17 @@ Vec2i_t t_getTerminalSize(void) {
 }
 
 #endif
+//////// UTILITY ////////
 
 
+
+
+
+
+
+
+//////// FRAMEBUFFER ////////
+//////// INITIALISATION ////////
 void t_createFramebuffer(const Vec2i_t resolution) {
 	//Overwrites the current instance of framebuffer (if valid) with a new FB.
 	if ((resolution.x <= 0.0f) || (resolution.y <= 0.0f)) {return; /* Invalid resize */}
@@ -72,9 +82,13 @@ void t_deleteFramebuffer(void) {
 	framebuffer.resolution = (Vec2i_t){0, 0};
 	framebuffer.valid = FALSE;
 }
+//////// INITIALISATION ////////
 
 
 
+
+
+//////// DIRECT DRAW ////////
 void t_writePX(const Vec2i_t position, RGB_t colour) {
 	if (!framebuffer.valid) {return;}
 	if (
@@ -103,50 +117,51 @@ RGB_t t_readPX(const Vec2i_t position) {
 
 	return framebuffer.data[(int)((position.y * framebuffer.resolution.x) + position.x)];
 }
+//////// DIRECT DRAW ////////
 
 
 
 
 static inline char* strAppend(char *dst, const char *src) {
-    while (*src) {*dst++ = *src++;} //Append using ptrs.
-    return dst;
+	while (*src) {*dst++ = *src++;} //Append using ptrs.
+	return dst;
 }
 
 
 static inline char* intAppend(char *dst, int v) {
 	//Append an integer, formatted correctly for an ANSI escape code.
-    char tmp[12];
-    int i = 0;
+	char tmp[12];
+	int i = 0;
 
-    if (v == 0) {
-        *dst++ = '0';
-        return dst;
-    }
+	if (v == 0) {
+		*dst++ = '0';
+		return dst;
+	}
 
-    while (v > 0) {
-        tmp[i++] = '0' + (v % 10);
-        v /= 10;
-    }
+	while (v > 0) {
+		tmp[i++] = '0' + (v % 10);
+		v /= 10;
+	}
 
-    while (i--) {*dst++ = tmp[i];}
-    return dst;
+	while (i--) {*dst++ = tmp[i];}
+	return dst;
 }
 
 
 static inline char* setForeground(char *out, const RGB_t c) {
 	*out++ = '\x1b'; *out++ = '['; *out++ = '3'; *out++ = '8'; *out++ = ';'; *out++ = '2'; *out++ = ';'; //"\x1b[38;2;"
-    out = intAppend(out, c.r); *out++ = ';';
-    out = intAppend(out, c.g); *out++ = ';';
-    out = intAppend(out, c.b); *out++ = 'm';
-    return out;
+	out = intAppend(out, c.r); *out++ = ';';
+	out = intAppend(out, c.g); *out++ = ';';
+	out = intAppend(out, c.b); *out++ = 'm';
+	return out;
 }
 
 static inline char* setBackground(char *out, const RGB_t c) {
 	*out++ = '\x1b'; *out++ = '['; *out++ = '4'; *out++ = '8'; *out++ = ';'; *out++ = '2'; *out++ = ';'; //"\x1b[48;2;"
-    out = intAppend(out, c.r); *out++ = ';';
-    out = intAppend(out, c.g); *out++ = ';';
-    out = intAppend(out, c.b); *out++ = 'm';
-    return out;
+	out = intAppend(out, c.r); *out++ = ';';
+	out = intAppend(out, c.g); *out++ = ';';
+	out = intAppend(out, c.b); *out++ = 'm';
+	return out;
 }
 
 
@@ -159,52 +174,52 @@ void t_resetCursor(void) {
 #define WIDTH  (framebuffer.resolution.x)
 #define HEIGHT (framebuffer.resolution.y)
 void t_drawFramebuffer(void) {
-    if (!framebuffer.valid) {return; /* Invalid, Can't show. */}
+	if (!framebuffer.valid) {return; /* Invalid, Can't show. */}
 
-    size_t bufferSize = (size_t)(framebuffer.resolution.x * (framebuffer.resolution.y/2 + 1) * 64);
-    char *buffer = malloc(bufferSize); //Start
-    char *out = buffer; //End
+	size_t bufferSize = (size_t)(framebuffer.resolution.x * (framebuffer.resolution.y/2 + 1) * 64);
+	char *buffer = malloc(bufferSize); //Start
+	char *out = buffer; //End
 
-    out = strAppend(out, "\x1b[0m"); //Definitely reset.
-    RGB_t topPrev = RGB_BLACK;
+	out = strAppend(out, "\x1b[0m"); //Definitely reset.
+	RGB_t topPrev = RGB_BLACK;
 	RGB_t lowPrev = RGB_BLACK;
 	int hasReset = TRUE; ///May not be accurate, force a colour change.
 
-    for (uint y=framebuffer.resolution.y-2; y>0u; y-=2u) {
-        for (uint x=0u; x<framebuffer.resolution.x; x++) {
+	for (uint y=framebuffer.resolution.y-2; y>0u; y-=2u) {
+		for (uint x=0u; x<framebuffer.resolution.x; x++) {
 
-            int topIndex = (y * framebuffer.resolution.x) + x;
-            int lowIndex = ((y + 1) * framebuffer.resolution.x) + x;
+			int topIndex = (y * framebuffer.resolution.x) + x;
+			int lowIndex = ((y + 1) * framebuffer.resolution.x) + x;
 
-            RGB_t top = (y + 1 < framebuffer.resolution.y) ? framebuffer.data[lowIndex] : RGB_BLACK;
-            RGB_t low = framebuffer.data[topIndex];
+			RGB_t top = (y + 1 < framebuffer.resolution.y) ? framebuffer.data[lowIndex] : RGB_BLACK;
+			RGB_t low = framebuffer.data[topIndex];
 
 
-            //Check if the colour needs to change.
-            if (hasReset || (top.r != topPrev.r) || (top.g != topPrev.g) || (top.b != topPrev.b)) {
-	            out = setForeground(out, top);
-			    topPrev = top;
+			//Check if the colour needs to change.
+			if (hasReset || (top.r != topPrev.r) || (top.g != topPrev.g) || (top.b != topPrev.b)) {
+				out = setForeground(out, top);
+				topPrev = top;
 			}
 			if (hasReset || (low.r != lowPrev.r) || (low.g != lowPrev.g) || (low.b != lowPrev.b)) {
-	            out = setBackground(out, low);
-			    lowPrev = low;
+				out = setBackground(out, low);
+				lowPrev = low;
 			}
 
 
-            *out++ = '\xE2'; //UTF8 "▀" char
-            *out++ = '\x96';
-            *out++ = '\x80';
-		    hasReset = FALSE; //Has not reset, free to assume continuous colour.
-        }
+			*out++ = '\xE2'; //UTF8 "▀" char
+			*out++ = '\x96';
+			*out++ = '\x80';
+			hasReset = FALSE; //Has not reset, free to assume continuous colour.
+		}
 
-        out = strAppend(out, "\x1b[0m\n"); //Reset formatting.
-    	topPrev = RGB_BLACK;
+		out = strAppend(out, "\x1b[0m\n"); //Reset formatting.
+		topPrev = RGB_BLACK;
 		lowPrev = RGB_BLACK;
 		hasReset = TRUE;
-    }
+	}
 
-    fwrite(buffer, 1, out - buffer, stdout);
-    free(buffer);
+	fwrite(buffer, 1, out - buffer, stdout);
+	free(buffer);
 }
 
 
@@ -221,3 +236,4 @@ void t_fillFramebuffer(RGB_t colour) {
 		*ptr = colour;
 	}
 }
+//////// FRAMEBUFFER ////////
