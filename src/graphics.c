@@ -103,7 +103,10 @@ int r_manageColumnValues(unsigned int x, unsigned int* lowYBound, unsigned int* 
 //////// TEXTURES ////////
 #define TEXTURE_RESOLUTION ((Vec2i_t){.x=32, .y=32})
 RGB_t* textures[MAX_TEXTURES]; //Stores texture data. Each entry is a 32×32 grid of pixel data (1D) organised by columns ([(x * 32) + y])
-
+uint8_t colourMap[256][256];
+//^^ Could make 256×256 map of lightLevel * channel value
+//Such that each pixel draws r=map[sector.lightLevel][texture.r] etc?
+//Or possibly precompute a new texture for each light level present in the list of sectors.
 
 
 int r_loadTexture(const char* path, RGB_t** pixels) { //Returns success
@@ -202,30 +205,14 @@ float r_inverseDistanceProjections(
 
 
 
-void r_getPlaneUV(
-	const Vec2f_t direction, const float startDistance, const float endDistance,
-	const int deltaY, Vec2f_t* uvStart, Vec2f_t* uvDelta,
-	const float scaling, const Vec2f_t offset
-) {
-	float deltaDistance = endDistance - startDistance;
-	Vec2f_t startUV = v2f_add(
-		v2f_mul(direction, startDistance * scaling), camera.position
-	); //Start at this UV
-	startUV = v2f_add(startUV, offset);
-	if (fabsf(deltaY) < EPSILON) {
-		//Don't work out any delta, they're too close to give a valid delta.
-		*uvDelta = (Vec2f_t){.x=0.0f, .y=0.0f};
-		return;
-	}
 
-	Vec2f_t endUV = v2f_add(
-		v2f_mul(direction, endDistance * scaling), camera.position
-	); //End at this UV
-	endUV = v2f_add(endUV, offset);
-
-	Vec2f_t uvChange = v2f_sub(endUV, startUV);
-	*uvDelta = v2f_div(uvChange, (float)(deltaY));
-	*uvStart = v2f_fract(startUV);
+RGB_t rgb_fetch(const RGB_t textureValue, const uint8_t lightLevel) {
+	//Fetches pre-lit 8b values for each channel.
+	return (RGB_t){
+		.r=colourMap[lightLevel][textureValue.r],
+		.g=colourMap[lightLevel][textureValue.g],
+		.b=colourMap[lightLevel][textureValue.b]
+	};
 }
 
 
@@ -278,7 +265,7 @@ void r_drawSolidColumn(
 	if (!r_getColumn(textureID, textureX, &texPTR)) {return;}
 	for (int y=yLow; y<yTop; y++) {
 		float t = (float)(y - lowYBound) / (float)(topYBound - lowYBound);
-		*ptr = rgb_umul(*(texPTR + (int)(t * (float)(TEXTURE_RESOLUTION.y))), thisSector->lightLevel);
+		*ptr = rgb_fetch(*(texPTR + (int)(t * (float)(TEXTURE_RESOLUTION.y))), thisSector->lightLevel);
 		ptr += framebuffer.resolution.x;
 	}
 	depthMap[screenX] = mappedDepth;
@@ -388,7 +375,7 @@ void r_drawPortalColumn(
 		ptr = fbPTR + screenX + (framebuffer.resolution.x * topYBoundFar);
 		for (int y=topYBoundFar; y<topYBoundNear; y++) {
 			float t = (float)(y - topYBoundFarUnclamp) / (float)(topYBoundNearUnclamp - topYBoundFarUnclamp);
-			*ptr = rgb_umul(*(texPTR + (int)(t * (float)TEXTURE_RESOLUTION.y)), nearSector->lightLevel);
+			*ptr = rgb_fetch(*(texPTR + (int)(t * (float)TEXTURE_RESOLUTION.y)), nearSector->lightLevel);
 			ptr += framebuffer.resolution.x;
 		}
 		ceilYMap[screenX] = yTop;
@@ -494,23 +481,61 @@ int r_clipLDVertices(Vec2f_t* start, Vec2f_t* end, float* startT, float* endT) {
 
 
 
-void r_drawSpan(const PlaneSpan_t* thisSpan, RGB_t* fbPTR) {
+void r_drawSpan(const PlaneSpan_t* thisSpan, RGB_t* fbPTR, const float aspectRatio) {
 	//Draws horizontal span of floor/ceiling, textured.
-	//TBA
-
 	unsigned int xStart = CLAMP(thisSpan->xStart, 0u, framebuffer.resolution.x-1u);
 	unsigned int xEnd = CLAMP(thisSpan->xEnd, 0u, framebuffer.resolution.x-1u);
 	if (thisSpan->row >= framebuffer.resolution.y) {return;}
 
-	//TEMPORARY DEBUG.
-	unsigned int rowStartIndex = (thisSpan->row * framebuffer.resolution.x);
+
+	float tStart = (float)(xStart) / (float)(framebuffer.resolution.x);
+	float tEnd = (float)(xEnd) / (float)(framebuffer.resolution.x);
+	float HALF_FOV = camera.FOV/2.0f;
+	float aStart = f_lerp(-HALF_FOV, HALF_FOV, tStart) + camera.yaw;
+	float aEnd = f_lerp(-HALF_FOV, HALF_FOV, tEnd) + camera.yaw;
+
+
+	float floorDistance; float ceilDistance;
 	Sector_t* thisSector = thisSpan->sector;
-	RGB_t colour = rgb_umul(
-		((thisSpan->isFloor) ? thisSector->floorColour : thisSector->ceilingColour),
-		thisSector->lightLevel
+	r_inverseDistanceProjections(
+		thisSector, aspectRatio,
+		thisSpan->row, thisSpan->row,
+		&ceilDistance, &floorDistance
 	);
+
+	Vec2f_t startDelta = (Vec2f_t) {
+		.x=sin(aStart), .y=cos(aStart)
+	};
+	Vec2f_t endDelta = (Vec2f_t) {
+		.x=sin(aEnd), .y=cos(aEnd)
+	};
+
+	if (thisSpan->isFloor) {
+		//isFloor
+		startDelta = v2f_mul(startDelta, floorDistance);
+		endDelta = v2f_mul(endDelta, floorDistance);
+	} else {
+		//isCeiling
+		startDelta = v2f_mul(startDelta, ceilDistance);
+		endDelta = v2f_mul(endDelta, ceilDistance);
+	}
+
+	Vec2f_t startPosition = v2f_add(camera.position, startDelta);
+	Vec2f_t endPosition = v2f_add(camera.position, endDelta);
+
+	Vec2f_t startUV = startPosition;
+	Vec2f_t endUV = endPosition;
+
+
+	RGB_t* rowStartPtr = fbPTR + (thisSpan->row * framebuffer.resolution.x);
 	for (unsigned int screenX=xStart; screenX<=xEnd; screenX++) {
-		fbPTR[rowStartIndex + screenX] = colour;
+		float t = (float)(screenX - xStart) / (float)(xEnd - xStart);
+		Vec2f_t interpUV = v2f_fract(v2f_lerp(startUV, endUV, t));
+		*(rowStartPtr + screenX) = (RGB_t){
+			.r=(uint8_t)(fabsf(interpUV.x * 255.0f)),
+			.g=(uint8_t)(fabsf(interpUV.y * 255.0f)),
+			.b=0u
+		};
 	}
 }
 
@@ -666,14 +691,14 @@ void r_drawLineDef(const LineDef_t* thisLineDef, RGB_t* fbPTR) {
 
 			} else {
 				//Current span must have ended.
-				r_drawSpan(&currentSpan, fbPTR); //Draw using it's extents and texture information.
+				r_drawSpan(&currentSpan, fbPTR, aspectRatio); //Draw using it's extents and texture information.
 				currentSpan.active = FALSE; //Invalidate span.
 			}
 		}
 
 		if (currentSpan.active) {
 			//Finish row by drawing current span.
-			r_drawSpan(&currentSpan, fbPTR); //Draw using it's extents and texture information.
+			r_drawSpan(&currentSpan, fbPTR, aspectRatio); //Draw using it's extents and texture information.
 			currentSpan.active = FALSE; //Invalidate span.
 		}
 	}
@@ -783,6 +808,16 @@ int r_loadTextures(const char** texturePaths, const unsigned int numTexturePaths
 
 		textures[i] = pixelData;
 		printf("Loaded [%s] successfully.\n", path);
+	}
+
+
+	//Create colourMap lookup values.
+	for (unsigned int lightLevel=0u; lightLevel<=0xFFu; lightLevel++) {
+		for (unsigned int channelValue=0u; channelValue<=0xFFu; channelValue++) {
+			colourMap[lightLevel][channelValue] = (uint8_t)(
+				(float)(lightLevel) * (float)(channelValue) / 255.0f
+			);
+		}
 	}
 
 	return TRUE; //Success
