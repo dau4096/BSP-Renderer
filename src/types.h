@@ -53,8 +53,8 @@ typedef struct {
 } LineDef_t;
 
 typedef struct {
-	float floorHeight; unsigned int floorTexture; //Floor data
-	float ceilingHeight; unsigned int ceilingTexture; //Ceiling data
+	float floorHeight; unsigned int floorTexture; RGB_t floorColour; //Floor data
+	float ceilingHeight; unsigned int ceilingTexture; RGB_t ceilingColour; //Ceiling data
 	unsigned int* lineDefs;    //Array of IDs to LineDef_t[] array (Like 3D model indices)
 	unsigned int numLineDefs; //Length of ID array [^^].
 	uint8_t lightLevel; //Brightness of the sector, 0-255

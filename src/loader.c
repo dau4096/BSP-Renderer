@@ -176,19 +176,38 @@ int l_getSectors(const xmlNode* root) {
 		unsigned int* lineDefsArr; unsigned int numLineDefs;
 		l_getLineDefsArrayAttr(secNode, &lineDefsArr, &numLineDefs);
 
+	#ifdef PLANE_SPAN_TEXTURING
 		const char* floorTextureName = l_getStrAttr(secNode, "floorTexture");
 		const char* ceilTextureName = l_getStrAttr(secNode, "ceilTexture");
 
 		*(geoIndex++) = (Sector_t){
 			.floorHeight=l_getFloatAttr(secNode, "floorZ"),
 			.floorTexture=l_assignTextureIndex(floorTextureName),
+			.floorColour=(RGB_t){.r=0u, .g=0u, .b=0u},
 
 			.ceilingHeight=l_getFloatAttr(secNode, "ceilZ"),
 			.ceilingTexture=l_assignTextureIndex(ceilTextureName),
+			.ceilingColour=(RGB_t){.r=0u, .g=0u, .b=0u},
 
 			.lineDefs=lineDefsArr, .numLineDefs=numLineDefs,
 			.lightLevel=l_getUIntAttr(secNode, "lightLevel")
 		};
+
+	#else
+
+		*(geoIndex++) = (Sector_t){
+			.floorHeight=l_getFloatAttr(secNode, "floorZ"),
+			.floorColour=l_getColourAttr(secNode, "floorC"),
+			.floorTexture=-1,
+
+			.ceilingHeight=l_getFloatAttr(secNode, "ceilZ"),
+			.ceilingColour=l_getColourAttr(secNode, "ceilC"),
+			.ceilingTexture=-1,
+
+			.lineDefs=lineDefsArr, .numLineDefs=numLineDefs,
+			.lightLevel=l_getUIntAttr(secNode, "lightLevel")
+		};
+	#endif
 	}
 
 	return TRUE;

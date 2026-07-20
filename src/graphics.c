@@ -489,6 +489,7 @@ void r_drawSpan(const PlaneSpan_t* thisSpan, RGB_t* fbPTR, const float aspectRat
 	if (thisSpan->row >= framebuffer.resolution.y) {return;}
 
 
+#ifdef PLANE_SPAN_TEXTURING 
 	float tStart = (float)(xStart) / (float)(framebuffer.resolution.x);
 	float tEnd = (float)(xEnd) / (float)(framebuffer.resolution.x);
 	float HALF_FOV = camera.FOV/2.0f;
@@ -543,6 +544,15 @@ void r_drawSpan(const PlaneSpan_t* thisSpan, RGB_t* fbPTR, const float aspectRat
 		RGB_t* texColour = (textures[spanTexture] + (uvInt.x * TEXTURE_RESOLUTION.y)) + uvInt.y;
 		*(rowStartPtr + screenX) = rgb_fetch(*texColour, thisSector->lightLevel);
 	}
+#else
+
+	RGB_t thisColour = (thisSpan->isFloor) ? thisSpan->sector->floorColour : thisSpan->sector->ceilingColour;
+	RGB_t* rowStartPtr = fbPTR + (thisSpan->row * framebuffer.resolution.x);
+	for (unsigned int screenX=xStart; screenX<=xEnd; screenX++) {
+		*(rowStartPtr + screenX) = rgb_fetch(thisColour, thisSpan->sector->lightLevel);
+	}
+
+#endif
 }
 
 
