@@ -47,6 +47,7 @@ static const char* l_getStrAttr(const xmlNode* node, const char* name) {
 
 static int l_getIntAttr(const xmlNode* node, const char* name) {
 	xmlChar* value = xmlGetProp(node, BAD_CAST name);
+    if (!value) {return 0;}
 	int result = (int)(strtol((const char*)(value), NULL, 10)); //Accept decimal only
 	xmlFree(value);
 	return result;
@@ -54,6 +55,7 @@ static int l_getIntAttr(const xmlNode* node, const char* name) {
 
 static unsigned int l_getUIntAttr(const xmlNode* node, const char* name) {
 	xmlChar* value = xmlGetProp(node, BAD_CAST name);
+    if (!value) {return 0u;}
 	int result = (unsigned int)(strtoul((const char*)(value), NULL, 0)); //Accept decimal and hexadecimal.
 	xmlFree(value);
 	return result;
@@ -61,6 +63,7 @@ static unsigned int l_getUIntAttr(const xmlNode* node, const char* name) {
 
 static float l_getFloatAttr(const xmlNode* node, const char* name) {
 	xmlChar* value = xmlGetProp(node, BAD_CAST name);
+    if (!value) {return 0.0f;}
 	float result = strtof((const char*)(value), NULL);
 	xmlFree(value);
 	return result;
@@ -68,6 +71,7 @@ static float l_getFloatAttr(const xmlNode* node, const char* name) {
 
 static RGB_t l_getColourAttr(const xmlNode* node, const char* name) {
 	const char* strAttr = l_getStrAttr(node, name);
+	if (!strAttr) {return RGB_MAGENTA;}
 
 	//Parse individually as R/G/B hex.
 	unsigned int r, g, b;
@@ -98,6 +102,8 @@ static unsigned int l_countUInts(const char* strAttr) {
 
 static void l_getLineDefsArrayAttr(const xmlNode* node, unsigned int** lineDefsArr, unsigned int* numLineDefs) {
 	const char* strAttr = l_getStrAttr(node, "lineDefs");
+	if (!strAttr) {*numLineDefs=0u; return;}
+
 	char *end;
 	*numLineDefs = l_countUInts(strAttr);
 	*lineDefsArr = (unsigned int*)calloc(*numLineDefs, sizeof(unsigned int));
@@ -117,6 +123,8 @@ static void l_getLineDefsArrayAttr(const xmlNode* node, unsigned int** lineDefsA
 unsigned int numAssignedTextures;
 const char* textureNames[MAX_TEXTURES];
 static unsigned int l_assignTextureIndex(const char* filePath) {
+	if (!filePath) {return fallbackTextureIndex;}
+
 	for (unsigned int i=0u; i<numAssignedTextures; i++) {
 		//Check if it's already in the dataset. If so, return the index.
 		if (strcmp(textureNames[i], filePath) == 0) {return i; /* Found */}
@@ -198,11 +206,11 @@ int l_getSectors(const xmlNode* root) {
 		*(geoIndex++) = (Sector_t){
 			.floorHeight=l_getFloatAttr(secNode, "floorZ"),
 			.floorColour=l_getColourAttr(secNode, "floorC"),
-			.floorTexture=-1,
+			.floorTexture=fallbackTextureIndex,
 
 			.ceilingHeight=l_getFloatAttr(secNode, "ceilZ"),
 			.ceilingColour=l_getColourAttr(secNode, "ceilC"),
-			.ceilingTexture=-1,
+			.ceilingTexture=fallbackTextureIndex,
 
 			.lineDefs=lineDefsArr, .numLineDefs=numLineDefs,
 			.lightLevel=l_getUIntAttr(secNode, "lightLevel")
@@ -288,6 +296,7 @@ int l_loadGeo(const char* filePath) {
 
 
 	numAssignedTextures = 0u;
+	fallbackTextureIndex = l_assignTextureIndex(FALLBACK_TEXTURE_PATH);
 
 
 	//Read the file

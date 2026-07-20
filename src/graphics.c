@@ -108,6 +108,7 @@ int r_manageColumnValues(unsigned int x, unsigned int* lowYBound, unsigned int* 
 #define TEXTURE_RESOLUTION ((Vec2i_t){.x=32, .y=32})
 RGB_t* textures[MAX_TEXTURES]; //Stores texture data. Each entry is a 32×32 grid of pixel data (1D) organised by columns ([(x * 32) + y])
 uint8_t colourMap[256][256];
+unsigned int fallbackTextureIndex;
 
 
 int r_loadTexture(const char* path, RGB_t** pixels) { //Returns success
