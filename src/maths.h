@@ -179,6 +179,16 @@ static Vec2f_t v2f_max(const Vec2f_t a, const Vec2f_t b) {
 	};
 }
 
+static Vec2f_t v2f_fract(const Vec2f_t a) {
+	//Only the fractional portion.
+	return v2f_sub(
+		a, (Vec2f_t){
+			.x=(float)((int)(a.x)),
+			.y=(float)((int)(a.y))
+		}
+	);
+}
+
 //////// VECTOR 2D MATHS ////////
 
 

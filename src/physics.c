@@ -249,7 +249,6 @@ void p_updateCamera(Camera_t* camera, double dt) {
 	float cameraHeadZ = camera->Z + CAMERA_HEAD_OFFSET;
 
 	isOnFloor = FALSE; //Auto-reset every tick, overwritten when on floor.
-	printf("%i %i\n", (cameraFootZ <= thisSector->floorHeight), (cameraHeadZ >= thisSector->ceilingHeight));
 	if (cameraFootZ <= thisSector->floorHeight) {
 		isOnFloor = TRUE;
 		camera->Z = thisSector->floorHeight - CAMERA_FEET_OFFSET; //Inverse offset to go feet→camera

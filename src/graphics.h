@@ -7,6 +7,8 @@
 
 //////// DATA ////////
 #define MAX_TEXTURES 64u
+#define FALLBACK_TEXTURE_PATH "textures/fallback.png"
+extern unsigned int fallbackTextureIndex;
 
 
 extern Camera_t* r_camera;

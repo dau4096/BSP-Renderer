@@ -50,7 +50,7 @@ int main(void) {
 	signal(SIGINT, signalHandler);
 
 	Vec2i_t tResChars = t_getTerminalSize();
-	tResChars.y -= UI_HEIGHT + 1u; //Subtract 1 more, to let the command prompt onscreen.
+	tResChars.y -= UI_HEIGHT + 2u; //Subtract 1 more, to let the command prompt onscreen.
 	Vec2i_t tResPX = (Vec2i_t){tResChars.x, tResChars.y*2};
 
 	t_createFramebuffer(tResPX); //Create framebuffer. (2D pixel data)
@@ -88,7 +88,7 @@ int main(void) {
 	do { //Frameloop
 		start = now();
 		Vec2i_t newTResChars = t_getTerminalSize();
-		newTResChars.y -= UI_HEIGHT + 1u; //Subtract 1 more, to let the command prompt onscreen.
+		newTResChars.y -= UI_HEIGHT + 2u; //Subtract 1 more, to let the command prompt onscreen.
 		if ((newTResChars.x != tResChars.x) || (newTResChars.y != tResChars.y)) {
 			//Remake framebuffer to fit new res.
 			tResChars = newTResChars;

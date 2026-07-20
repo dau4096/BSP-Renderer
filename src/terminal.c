@@ -71,7 +71,6 @@ void t_createFramebuffer(const Vec2i_t resolution) {
 	framebuffer.resolution = resolution;
 	framebuffer.data = calloc((int)(resolution.x * resolution.y), sizeof(RGB_t)); //allocate.
 	framebuffer.valid = (framebuffer.data != NULL);
-	printf("\nreallocated! [%i, %i]\n", framebuffer.resolution.x, framebuffer.resolution.y);
 }
 
 RGB_t* t_getFramebufferPTR(void) {return framebuffer.data;}
