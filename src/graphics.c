@@ -798,7 +798,7 @@ void r_initCamera(void) {
 	camera = (Camera_t){
 		.position=(Vec2f_t){.x=0.0f, .y=0.0f},
 		.yaw=0.0f, .FOV=1.22173f, //70 degrees in radians
-		.maxDistance=32.0f,
+		.maxDistance=256.0f,
 		.forward=(Vec2f_t){.x=0.0f, .y=1.0f}
 	};
 }
