@@ -35,9 +35,9 @@
 
 
 	<sectors>
-		<sector floorZ="-2.0" floorC="FF0000" ceilZ="2.0" ceilC="FF00FF" lineDefs="0 1 2 3 4" lightLevel="127" />
-		<sector floorZ="-2.25" floorC="0000FF" ceilZ="5.0" ceilC="00FFFF" lineDefs="3 5 6 7" lightLevel="32" />
-		<sector floorZ="-0.5" floorC="00FF00" ceilZ="0.5" ceilC="FFFF00" lineDefs="1 8 9" lightLevel="255" />
+		<sector floorZ="-2.0" floorTexture="textures/fallback.png" ceilZ="2.0" ceilTexture="textures/fallback.png" lineDefs="0 1 2 3 4" lightLevel="127" />
+		<sector floorZ="-2.25" floorTexture="textures/fallback.png" ceilZ="5.0" ceilTexture="textures/fallback.png" lineDefs="3 5 6 7" lightLevel="32" />
+		<sector floorZ="-0.5" floorTexture="textures/fallback.png" ceilZ="0.5" ceilTexture="textures/fallback.png" lineDefs="1 8 9" lightLevel="255" />
 	</sectors>
 
 </geometry>

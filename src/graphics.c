@@ -34,6 +34,10 @@ Sector_t* g_sectors; //Sectors made of LineDefs.
 //////// CONSTANTS ////////
 #define EPSILON 1.0e-3f
 #define NEAR_PLANE 1.0e-3f
+
+
+#define PLANE_UV_SCALE 2.0f
+#define PLANE_UV_OFFSET (Vec2f_t){.x=0.0f, .y=0.0f}
 //////// CONSTANTS ////////
 
 
@@ -104,9 +108,6 @@ int r_manageColumnValues(unsigned int x, unsigned int* lowYBound, unsigned int* 
 #define TEXTURE_RESOLUTION ((Vec2i_t){.x=32, .y=32})
 RGB_t* textures[MAX_TEXTURES]; //Stores texture data. Each entry is a 32×32 grid of pixel data (1D) organised by columns ([(x * 32) + y])
 uint8_t colourMap[256][256];
-//^^ Could make 256×256 map of lightLevel * channel value
-//Such that each pixel draws r=map[sector.lightLevel][texture.r] etc?
-//Or possibly precompute a new texture for each light level present in the list of sectors.
 
 
 int r_loadTexture(const char* path, RGB_t** pixels) { //Returns success
@@ -510,32 +511,37 @@ void r_drawSpan(const PlaneSpan_t* thisSpan, RGB_t* fbPTR, const float aspectRat
 		.x=sin(aEnd), .y=cos(aEnd)
 	};
 
+	unsigned int spanTexture;
 	if (thisSpan->isFloor) {
 		//isFloor
 		startDelta = v2f_mul(startDelta, floorDistance);
 		endDelta = v2f_mul(endDelta, floorDistance);
+		spanTexture = thisSector->floorTexture;
+
 	} else {
 		//isCeiling
 		startDelta = v2f_mul(startDelta, ceilDistance);
 		endDelta = v2f_mul(endDelta, ceilDistance);
+		spanTexture = thisSector->ceilingTexture;
 	}
 
 	Vec2f_t startPosition = v2f_add(camera.position, startDelta);
 	Vec2f_t endPosition = v2f_add(camera.position, endDelta);
 
-	Vec2f_t startUV = startPosition;
-	Vec2f_t endUV = endPosition;
+	Vec2f_t startUV = v2f_add(v2f_div(startPosition, PLANE_UV_SCALE), PLANE_UV_OFFSET);
+	Vec2f_t endUV = v2f_add(v2f_div(endPosition, PLANE_UV_SCALE), PLANE_UV_OFFSET);
 
 
 	RGB_t* rowStartPtr = fbPTR + (thisSpan->row * framebuffer.resolution.x);
 	for (unsigned int screenX=xStart; screenX<=xEnd; screenX++) {
 		float t = (float)(screenX - xStart) / (float)(xEnd - xStart);
 		Vec2f_t interpUV = v2f_fract(v2f_lerp(startUV, endUV, t));
-		*(rowStartPtr + screenX) = (RGB_t){
-			.r=(uint8_t)(fabsf(interpUV.x * 255.0f)),
-			.g=(uint8_t)(fabsf(interpUV.y * 255.0f)),
-			.b=0u
+		Vec2i_t uvInt = (Vec2i_t){
+			.x=(int)(fabsf(interpUV.x * TEXTURE_RESOLUTION.x)) % TEXTURE_RESOLUTION.x,
+			.y=(int)(fabsf(interpUV.y * TEXTURE_RESOLUTION.y)) % TEXTURE_RESOLUTION.y
 		};
+		RGB_t* texColour = (textures[spanTexture] + (uvInt.x * TEXTURE_RESOLUTION.y)) + uvInt.y;
+		*(rowStartPtr + screenX) = rgb_fetch(*texColour, thisSector->lightLevel);
 	}
 }
 

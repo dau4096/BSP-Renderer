@@ -176,12 +176,15 @@ int l_getSectors(const xmlNode* root) {
 		unsigned int* lineDefsArr; unsigned int numLineDefs;
 		l_getLineDefsArrayAttr(secNode, &lineDefsArr, &numLineDefs);
 
+		const char* floorTextureName = l_getStrAttr(secNode, "floorTexture");
+		const char* ceilTextureName = l_getStrAttr(secNode, "ceilTexture");
+
 		*(geoIndex++) = (Sector_t){
 			.floorHeight=l_getFloatAttr(secNode, "floorZ"),
-			.floorColour=l_getColourAttr(secNode, "floorC"),
+			.floorTexture=l_assignTextureIndex(floorTextureName),
 
 			.ceilingHeight=l_getFloatAttr(secNode, "ceilZ"),
-			.ceilingColour=l_getColourAttr(secNode, "ceilC"),
+			.ceilingTexture=l_assignTextureIndex(ceilTextureName),
 
 			.lineDefs=lineDefsArr, .numLineDefs=numLineDefs,
 			.lightLevel=l_getUIntAttr(secNode, "lightLevel")
@@ -290,11 +293,11 @@ int l_loadGeo(const char* filePath) {
 
 
 	//Read camera start information
-	if (!l_repositionCamera(root)) {return FALSE; /* Failiure */}
+	if (!l_repositionCamera(root)) {return FALSE; /* Could not move camera */}
 
 
 	//Load all textures;
-	r_loadTextures(textureNames, numAssignedTextures);
+	if (!r_loadTextures(textureNames, numAssignedTextures)) {return FALSE; /* Could not load textures */}
 
 
 	//Cleanup
