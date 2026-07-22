@@ -9,6 +9,10 @@
 
 #include "graphics.h"
 
+#ifdef DEBUG_DRAW_ORDER
+#include "io.h"
+#endif
+
 #include "types.h"
 #include "maths.h"
 #include "terminal.h"
@@ -778,6 +782,11 @@ void r_sortLineDefs(
 }
 
 
+
+#ifdef DEBUG_DRAW_ORDER
+int currentDrawNumber = 0u;
+#endif
+
 void r_drawFrame(void) {
 	RGB_t* fbPTR = t_getFramebufferPTR();
 	r_clearColumnBuffers(); //Reset depth data & column bottom/top data for this frame.
@@ -787,6 +796,14 @@ void r_drawFrame(void) {
 	LineDef_t** sortedLineDefs = calloc(g_numLineDefs, sizeof(LineDef_t*));
 	unsigned int numValidLineDefs = 0u;
 	r_sortLineDefs(sortedLineDefs, &numValidLineDefs);
+
+
+#ifdef DEBUG_DRAW_ORDER
+	if (keyMapPress[K_DEBUG_DRAW_INC]) {currentDrawNumber--;}
+	if (keyMapPress[K_DEBUG_DRAW_DEC]) {currentDrawNumber++;}
+	currentDrawNumber = CLAMP(currentDrawNumber, 0, numValidLineDefs);
+	numValidLineDefs -= currentDrawNumber;
+#endif
 
 
 	for (unsigned int ldIndex=0u; ldIndex<numValidLineDefs; ldIndex++) {

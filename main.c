@@ -145,7 +145,7 @@ int main(void) {
 	#ifdef SUPPRESS_FRAMEBUFFER_OUTPUT
 		printf("\n");
 	#endif
-	} while (run && !(keyMap[K_QUIT]));
+	} while (run && !(keyMapPress[K_QUIT]));
 	printf("\n");
 
 	t_deleteFramebuffer();

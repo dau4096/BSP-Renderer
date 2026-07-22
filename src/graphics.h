@@ -22,6 +22,11 @@ extern unsigned int g_numSectors;
 extern Vec2f_t* g_vertices;
 extern LineDef_t* g_lineDefs;
 extern Sector_t* g_sectors;
+
+
+#ifdef DEBUG_DRAW_ORDER
+extern int currentDrawNumber;
+#endif
 //////// DATA ////////
 
 

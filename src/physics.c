@@ -185,12 +185,11 @@ int p_getSectorID(
 
 
 
-int prevJump = FALSE;
 int isOnFloor = FALSE;
 Vec2f_t p_handleInputs(Camera_t* camera, double dt) {
 	//Camera Controls
-	if (keyMap[K_TURN_LEFT]) {camera->yaw -= TURNING_SPEED * dt;}
-	if (keyMap[K_TURN_RIGHT]) {camera->yaw += TURNING_SPEED * dt;}
+	if (keyMapHold[K_TURN_LEFT]) {camera->yaw -= TURNING_SPEED * dt;}
+	if (keyMapHold[K_TURN_RIGHT]) {camera->yaw += TURNING_SPEED * dt;}
 	camera->yaw = fmod(camera->yaw, 2.0f * M_PI);
 	if (camera->yaw < 0.0f) {camera->yaw += 2.0f * M_PI;}
 
@@ -201,18 +200,17 @@ Vec2f_t p_handleInputs(Camera_t* camera, double dt) {
 
 	//Move camera based on inputs.
 	float movementSpeed = MOVEMENT_SPEED_BASE * dt;
-	if (keyMap[K_MOVE_FAST]) {movementSpeed *= 2.5f;}
+	if (keyMapHold[K_MOVE_FAST]) {movementSpeed *= 2.5f;}
 	Vec2f_t forward = v2f_mul(camera->forward, movementSpeed);
 	Vec2f_t right = (Vec2f_t){.x=forward.y, .y=-forward.x};
 
 	Vec2f_t moveDelta = (Vec2f_t){.x=0.0f, .y=0.0f};
-	if (keyMap[K_MOVE_FORE]) {moveDelta = v2f_add(moveDelta, forward);}
-	if (keyMap[K_MOVE_BACK]) {moveDelta = v2f_sub(moveDelta, forward);}
-	if (keyMap[K_MOVE_LEFT]) {moveDelta = v2f_sub(moveDelta, right);}
-	if (keyMap[K_MOVE_RIGHT]) {moveDelta = v2f_add(moveDelta, right);}
+	if (keyMapHold[K_MOVE_FORE]) {moveDelta = v2f_add(moveDelta, forward);}
+	if (keyMapHold[K_MOVE_BACK]) {moveDelta = v2f_sub(moveDelta, forward);}
+	if (keyMapHold[K_MOVE_LEFT]) {moveDelta = v2f_sub(moveDelta, right);}
+	if (keyMapHold[K_MOVE_RIGHT]) {moveDelta = v2f_add(moveDelta, right);}
 
-	if (keyMap[K_MOVE_JUMP] && !prevJump && isOnFloor) {camera->Zvelocity += JUMP_SPEED;}
-	prevJump = keyMap[K_MOVE_JUMP];
+	if (keyMapPress[K_MOVE_JUMP] && isOnFloor) {camera->Zvelocity += JUMP_SPEED;}
 
 	return moveDelta;
 }

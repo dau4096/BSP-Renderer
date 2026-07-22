@@ -9,7 +9,10 @@
 
 
 
-int keyMap[NUM_KEYS];
+int keyMapPress[NUM_KEYS];
+int keyMapHold[NUM_KEYS];
+
+int keyMapPrevious[NUM_KEYS];
 
 
 #ifndef _WIN32 //Linux only;
@@ -128,6 +131,12 @@ int getID(int key) {
 		case KEY_LEFT: {return K_TURN_LEFT;}
 		case KEY_RIGHT: {return K_TURN_RIGHT;}
 
+
+	#ifdef DEBUG_DRAW_ORDER
+		case KEY_2: {return K_DEBUG_DRAW_INC;}
+		case KEY_3: {return K_DEBUG_DRAW_DEC;}
+	#endif
+
 		default: {return NUM_KEYS; /* Invalid. */}
 	}
 }
@@ -136,6 +145,9 @@ int getID(int key) {
 
 #define MAX_EVENTS_PER_FRAME 64
 void io_pollEvents(void) {
+	memcpy(keyMapPrevious, keyMapHold, sizeof(keyMapHold));
+	memset(keyMapPress, 0, sizeof(keyMapPress));
+
 	for (unsigned int fdID=0u; fdID<numFDs; fdID++) {
 		struct input_event ev;
 		size_t count = 0;
@@ -148,7 +160,10 @@ void io_pollEvents(void) {
 
 				if (ev.type == EV_KEY) {
 					int ID = getID(ev.code);
-					if (ID < NUM_KEYS) {keyMap[ID] = (ev.value != 0); /* Update keyMap */}
+					if (ID < NUM_KEYS) {
+						//Update keymap
+						keyMapHold[ID] = (ev.value != 0);
+					}
 				}
 
 				count++;
@@ -162,6 +177,10 @@ void io_pollEvents(void) {
 				break;
 			}
 		}
+	}
+
+	for (unsigned int i=0u; i<NUM_KEYS; i++) {
+	    keyMapPress[i] = keyMapHold[i] && !keyMapPrevious[i];
 	}
 }
 
@@ -206,7 +225,9 @@ void io_pollEvents(void) {
 		SHORT state = GetAsyncKeyState(vk);
 
 		//High bit → key currently pressed
-		keyMap[ID] = ((state & 0x8000) != 0);
+		keyMapPrevious[ID] = keyMapHold[ID];
+		keyMapHold[ID] = ((state & 0x8000) != 0);
+		keyMapPress[ID] = keyMapHold[ID] && !keyMapPrevious[ID];
 	}
 }
 

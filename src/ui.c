@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <math.h>
 
+#include "io.h"
 #include "graphics.h"
 #include "physics.h"
 
@@ -24,22 +25,26 @@ void ui_drawDebugValues(const Vec2i_t resolution, const int uiHeight) {
 	);
 
 
-	printf( //3rd line : Physics information
-		"Floor: [%s]    Portal: [%s]    Prev-Jump: [%s]\n",
-		((isOnFloor) ? "TRUE " : "FALSE"), //Seems to alternate every other frame? Investigate.
+#ifdef DEBUG_DRAW_ORDER
+	printf( //3rd line : Physics information & Debug
+		"Floor: [%s]    Portal: [%s]    Drawn-LDs: [%u]\n",
+		((isOnFloor) ? "TRUE " : "FALSE"),
 		((isInPortal) ? "TRUE " : "FALSE"),
-		((prevJump) ? "TRUE " : "FALSE")
+		g_numLineDefs-currentDrawNumber
 	);
+#else
+	printf( //3rd line : Physics information
+		"Floor: [%s]    Portal: [%s]\n",
+		((isOnFloor) ? "TRUE " : "FALSE"),
+		((isInPortal) ? "TRUE " : "FALSE")
+	);
+#endif
 
 
-	unsigned int numSectors = 0u;
-	unsigned int numLineDefs = 0u;
-	for (Sector_t* thisSector=g_sectors; thisSector<g_sectors+g_numSectors; thisSector++) {if (thisSector->numLineDefs) {numSectors++;}}
-	for (LineDef_t* thisLineDef=g_lineDefs; thisLineDef<g_lineDefs+g_numLineDefs; thisLineDef++) {if (thisLineDef->isValid) {numLineDefs++;}}
 	printf( //4th line : Graphics information
 		"Resolution: [%i, %i]    Sectors: [%u]    LineDefs: [%u]\n",
 		resolution.x, resolution.y*2,
-		numSectors, numLineDefs
+		g_numSectors, g_numLineDefs
 	);
 }
 
