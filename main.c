@@ -67,7 +67,7 @@ int main(void) {
 
 
 	r_initCamera();
-	int loadXMLSuccess = l_loadGeo("xml/test.xml");
+	int loadXMLSuccess = l_loadGeo("xml/doom.xml");
 	if (!loadXMLSuccess) {
 		//Failed to read an XML file properly
 		printf("Failed to read XML file.\n");

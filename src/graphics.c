@@ -234,7 +234,7 @@ void r_drawSolidColumn(
 	//Check column maps;
 	int minYBound = lowYMap[screenX];
 	int maxYBound = topYMap[screenX];
-	if (minYBound == maxYBound) {return; /* Column is full */}
+	if (minYBound >= maxYBound) {return; /* Column is full */}
 
 	//Draw this wall collumn.
 	int lowYBound, topYBound; //Area this column should span (inside segment)
@@ -242,7 +242,7 @@ void r_drawSolidColumn(
 	r_getLineDefSectorProjections(
 		thisSector, invDistance, &lowYBound, &topYBound
 	);
-	if ((topYBound<minYBound) || (lowYBound>=maxYBound)) {return; /* Completely offscreen vertically. */}
+	if ((topYBound<=minYBound) || (lowYBound>=maxYBound)) {return; /* Completely offscreen vertically. */}
 
 	int yLow = fmax(lowYBound, minYBound);
 	int yTop = fmin(topYBound, maxYBound);
@@ -253,6 +253,7 @@ void r_drawSolidColumn(
 
 	floorYMap[screenX] = yLow;
 	ceilYMap[screenX] = yTop;
+
 
 
 #ifdef DEBUG_BORDERS
@@ -641,6 +642,8 @@ void r_drawLineDef(const LineDef_t* thisLineDef, RGB_t* fbPTR) {
 	//Draw, interpolating.
 	float aspectRatio = (float)(framebuffer.resolution.x) / (float)(framebuffer.resolution.y);
 	float textureX = 0.0f;
+	unsigned int lowestPossibleSpan = 0u;
+	unsigned int highestPossibleSpan = framebuffer.resolution.y;
 	for (int screenX=leftMostClamp; screenX<=rightMostClamp; screenX++) {
 		float interp = (float)(screenX - leftMost) / (float)(range);
 		float invDistance = MIN(f_lerp(lInvDepth, rInvDepth, interp), 1.0f / NEAR_PLANE);
@@ -649,8 +652,16 @@ void r_drawLineDef(const LineDef_t* thisLineDef, RGB_t* fbPTR) {
 
 
 		//Copy old buffers from BEFORE drawing new frame's column
+		//r_drawSolidColumn and r_drawPortalColumn modify these.
 		lowYMapOld[screenX] = lowYMap[screenX];
 		topYMapOld[screenX] = topYMap[screenX];
+		lowestPossibleSpan = MIN(lowestPossibleSpan, lowYMap[screenX]);
+		highestPossibleSpan = MAX(highestPossibleSpan, lowYMap[screenX]);
+		floorYMap[screenX] = lowYMap[screenX];
+		ceilYMap[screenX] = lowYMap[screenX];
+
+
+		if (lowYMap[screenX] == topYMap[screenX]) {continue; /* Occluded */}
 
 
 		float t = f_lerp(leftT, rightT, interp);
@@ -677,11 +688,16 @@ void r_drawLineDef(const LineDef_t* thisLineDef, RGB_t* fbPTR) {
 	Sector_t* thisSector = (g_sectors+closeSectorID);
 	PlaneSpan_t currentSpan;
 	currentSpan.active = FALSE;
-	for (unsigned int row=0u; row<framebuffer.resolution.y; row++) {
+	//Only checks in X and Y range that couldve been modified.
+	for (unsigned int row=lowestPossibleSpan; row<highestPossibleSpan; row++) {
 		for (unsigned int column=leftMostClamp; column<=rightMostClamp; column++) {
 			//Only search the area acctually modified by the linedef drawing loop above
-			if (lowYMapOld[column] == topYMapOld[column]) {continue; /* Column was never written to; was already filled. */}
-			if ((lowYMapOld[column] <= row) && (floorYMap[column] > row)) {
+			int columnDidChange = !(
+				(lowYMapOld[column] == lowYMap[column]) &&
+				(topYMapOld[column] == topYMap[column])
+			); //Column was never written to; was already filled.
+
+			if (columnDidChange && (lowYMapOld[column] <= row) && (floorYMap[column] > row)) {
 				if (currentSpan.active) {
 					//Floor here. Modify current span for this row to include this column.
 					currentSpan.xEnd = column;
@@ -696,7 +712,7 @@ void r_drawLineDef(const LineDef_t* thisLineDef, RGB_t* fbPTR) {
 				}
 
 
-			} else if ((topYMapOld[column] > row) && (ceilYMap[column] <= row)) {
+			} else if (columnDidChange && (topYMapOld[column] > row) && (ceilYMap[column] <= row)) {
 				if (currentSpan.active) {
 					//Ceiling here. Modify current span for this row to include this column.
 					currentSpan.xEnd = column;
