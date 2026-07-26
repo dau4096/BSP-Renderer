@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- generic.xml -->
+<!-- original.xml -->
 
 
 <geometry>
@@ -35,9 +35,9 @@
 
 
 	<sectors>
-		<sector floorZ="-2.0" floorTexture="textures/grey.png" floorC="FF0000" ceilZ="2.0" ceilTexture="textures/white.png" ceilC="FF00FF" lineDefs="0 1 2 3 4" lightLevel="127" />
-		<sector floorZ="-2.25" floorTexture="textures/grey.png" floorC="0000FF" ceilZ="5.0" ceilTexture="textures/white.png" ceilC="00FFFF" lineDefs="3 5 6 7" lightLevel="32" />
-		<sector floorZ="-0.5" floorTexture="textures/grey.png" floorC="00FF00" ceilZ="0.5" ceilTexture="textures/white.png" ceilC="FFFF00" lineDefs="1 8 9" lightLevel="255" />
+		<sector floorZ="-2.0" floorTexture="textures/darkgrey.png" floorC="FF0000" ceilZ="2.0" ceilTexture="textures/white.png" ceilC="FF00FF" lineDefs="0 1 2 3 4" lightLevel="127" />
+		<sector floorZ="-2.25" floorTexture="textures/darkgrey.png" floorC="0000FF" ceilZ="5.0" ceilTexture="textures/white.png" ceilC="00FFFF" lineDefs="3 5 6 7" lightLevel="32" />
+		<sector floorZ="-0.5" floorTexture="textures/darkgrey.png" floorC="00FF00" ceilZ="0.5" ceilTexture="textures/white.png" ceilC="FFFF00" lineDefs="1 8 9" lightLevel="255" />
 	</sectors>
 
 </geometry>

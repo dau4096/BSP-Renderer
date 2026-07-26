@@ -4,6 +4,7 @@
 #include <signal.h>
 #include <time.h>
 #include <math.h>
+#include <string.h>
 
 #include "src/types.h"
 #include "src/terminal.h"
@@ -46,8 +47,19 @@ double now(void) {
 #endif
 
 
-int main(void) {
+int main(int argc, char* argv[]) {
 	signal(SIGINT, signalHandler);
+
+
+	char xmlFileName[64];
+	if (argc > 1) {
+		//Very simple cmdline handling for arguments. Only has XML filepath currently.
+		strcpy(xmlFileName, "xml/");
+		strcat(xmlFileName, argv[1]);
+	} else {
+		strcpy(xmlFileName, "xml/doom.xml");
+	}
+
 
 	Vec2i_t tResChars = t_getTerminalSize();
 	tResChars.y -= UI_HEIGHT + 2u; //Subtract 1 more, to let the command prompt onscreen.
@@ -67,7 +79,7 @@ int main(void) {
 
 
 	r_initCamera();
-	int loadXMLSuccess = l_loadGeo("xml/doom.xml");
+	int loadXMLSuccess = l_loadGeo(xmlFileName);
 	if (!loadXMLSuccess) {
 		//Failed to read an XML file properly
 		printf("Failed to read XML file.\n");

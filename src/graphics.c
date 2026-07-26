@@ -10,7 +10,7 @@
 #include "graphics.h"
 
 #ifdef DEBUG_DRAW_ORDER
-#include "io.h"
+	#include "io.h"
 #endif
 
 #include "types.h"
