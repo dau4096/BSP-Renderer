@@ -81,14 +81,17 @@ void r_reallocColumnBuffers(void) {
 
 void r_clearColumnBuffers() {
 	memset(lowYMap, (unsigned int)(0x00u), framebuffer.resolution.x * sizeof(Depth_t)); //Reset to all 0x00 (0px, bottom of the screen) values.
+	memset(lowYMapOld, (unsigned int)(0x00u), framebuffer.resolution.x * sizeof(Depth_t)); //Reset to all 0x00 (0px, bottom of the screen) values.
 	memset(depthMap, (Depth_t)(0xFFu), framebuffer.resolution.x * sizeof(Depth_t)); //Reset to all 0xFF (255, max depth) values.
 	for (unsigned int* ptr=topYMap; ptr<(topYMap+framebuffer.resolution.x); ptr++) {*ptr = framebuffer.resolution.y; /* Set to all [resY] values. */}
+	for (unsigned int* ptr=topYMapOld; ptr<(topYMapOld+framebuffer.resolution.x); ptr++) {*ptr = framebuffer.resolution.y; /* Set to all [resY] values. */}
 }
 
 
 Depth_t r_mapDepth(float depthF) {
+	float t = log(depthF / camera.near) / log(camera.far / camera.near);
 	return (Depth_t)(
-		fmin(depthF / camera.maxDistance, 1.0f) * 255.0f //Remap to 0-255.
+		sqrtf(t) * 255.0f //Remap to 0-255.
 	);
 }
 
@@ -842,7 +845,8 @@ void r_initCamera(void) {
 	camera = (Camera_t){
 		.position=(Vec2f_t){.x=0.0f, .y=0.0f},
 		.yaw=0.0f, .FOV=1.22173f, //70 degrees in radians
-		.maxDistance=256.0f,
+		.near=0.1f,
+		.far=128.0f,
 		.forward=(Vec2f_t){.x=0.0f, .y=1.0f}
 	};
 }

@@ -89,9 +89,10 @@ typedef struct {
 	Vec2f_t forward;
 	float Zvelocity; //Vertical speed.
 
-	float yaw; //Yaw in radians
-	float FOV; //FOV in radians
-	float maxDistance; //Maximum view distance
+	float yaw;  //Yaw in radians
+	float FOV;  //FOV in radians
+	float near; //Minimum view distance
+	float far;  //Maximum view distance
 } Camera_t;
 
 
