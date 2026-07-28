@@ -223,19 +223,19 @@
 
 
 	<sectors>
-		<sector floorZ="0.0" floorColour="555555" ceilZ="5.0" ceilColour="FFFFFF" lineDefs="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 58 59 60 61 62 63 64" lightLevel="150" />
-		<sector floorZ="-0.5" floorColour="555555" ceilZ="8.0" ceilColour="FFFFFF" lineDefs="24 28 29 30 31 32 33 34 35 36" lightLevel="200" />
-		<sector floorZ="-1.0" floorColour="555555" ceilZ="10.0" ceilColour="FFFFFF" lineDefs="26 37 38 24 32 35 39 40 16 45 46 47" lightLevel="255" />
-		<sector floorZ="0.5" floorColour="555555" ceilZ="8.5" ceilColour="FFFFFF" lineDefs="41 42 43 44 45 46 47 48 49" lightLevel="255" />
-		<sector floorZ="0.0" floorColour="555555" ceilZ="8.5" ceilColour="FFFFFF" lineDefs="49 65 66 67 68 69 70 71 72 73 74 75 81 82 83 84 85 86 87 88 61 65 66 67 68 69 89 90 91 92 93 70 94 95 96 97 98 71 72 73 74 75" lightLevel="150" />
-		<sector floorZ="4.0" floorColour="555555" ceilZ="8.5" ceilColour="FFFFFF" lineDefs="68 72 76 77 78 79 80" lightLevel="200" />
+		<sector floorZ="0.0" floorColour="555555" ceilZ="5.0" ceilColour="FFFFFF" lightLevel="150" />
+		<sector floorZ="-0.5" floorColour="555555" ceilZ="8.0" ceilColour="FFFFFF" lightLevel="200" />
+		<sector floorZ="-1.0" floorColour="555555" ceilZ="10.0" ceilColour="FFFFFF" lightLevel="255" />
+		<sector floorZ="0.5" floorColour="555555" ceilZ="8.5" ceilColour="FFFFFF" lightLevel="255" />
+		<sector floorZ="0.0" floorColour="555555" ceilZ="8.5" ceilColour="FFFFFF" lightLevel="150" />
+		<sector floorZ="4.0" floorColour="555555" ceilZ="8.5" ceilColour="FFFFFF" lightLevel="200" />
 
-		<sector floorZ="0.57" floorColour="AAAAAA" ceilZ="8.5" ceilColour="FFFFFF" lineDefs="93 70 94 99" lightLevel="158" />
-		<sector floorZ="1.14" floorColour="AAAAAA" ceilZ="8.5" ceilColour="FFFFFF" lineDefs="92 99 95 100" lightLevel="166" />
-		<sector floorZ="1.71" floorColour="AAAAAA" ceilZ="8.5" ceilColour="FFFFFF" lineDefs="91 100 96 101" lightLevel="175" />
-		<sector floorZ="2.29" floorColour="AAAAAA" ceilZ="8.5" ceilColour="FFFFFF" lineDefs="90 101 97 102" lightLevel="183" />
-		<sector floorZ="2.86" floorColour="AAAAAA" ceilZ="8.5" ceilColour="FFFFFF" lineDefs="89 102 98 103" lightLevel="191" />
-		<sector floorZ="3.43" floorColour="AAAAAA" ceilZ="8.5" ceilColour="FFFFFF" lineDefs="69 103 71 104" lightLevel="200" />
+		<sector floorZ="0.57" floorColour="AAAAAA" ceilZ="8.5" ceilColour="FFFFFF" lightLevel="158" />
+		<sector floorZ="1.14" floorColour="AAAAAA" ceilZ="8.5" ceilColour="FFFFFF" lightLevel="166" />
+		<sector floorZ="1.71" floorColour="AAAAAA" ceilZ="8.5" ceilColour="FFFFFF" lightLevel="175" />
+		<sector floorZ="2.29" floorColour="AAAAAA" ceilZ="8.5" ceilColour="FFFFFF" ightLevel="183" />
+		<sector floorZ="2.86" floorColour="AAAAAA" ceilZ="8.5" ceilColour="FFFFFF" lightLevel="191" />
+		<sector floorZ="3.43" floorColour="AAAAAA" ceilZ="8.5" ceilColour="FFFFFF" lightLevel="200" />
 	</sectors>
 
 </geometry>
