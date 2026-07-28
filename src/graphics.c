@@ -80,18 +80,21 @@ void r_reallocColumnBuffers(void) {
 
 
 void r_clearColumnBuffers() {
-	memset(lowYMap, (unsigned int)(0x00u), framebuffer.resolution.x * sizeof(Depth_t)); //Reset to all 0x00 (0px, bottom of the screen) values.
-	memset(lowYMapOld, (unsigned int)(0x00u), framebuffer.resolution.x * sizeof(Depth_t)); //Reset to all 0x00 (0px, bottom of the screen) values.
+	memset(lowYMap, (unsigned int)(0x00u), framebuffer.resolution.x * sizeof(unsigned int)); //Reset to all 0x00 (0px, bottom of the screen) values.
+	memset(lowYMapOld, (unsigned int)(0x00u), framebuffer.resolution.x * sizeof(unsigned int)); //Reset to all 0x00 (0px, bottom of the screen) values.
 	memset(depthMap, (Depth_t)(0xFFu), framebuffer.resolution.x * sizeof(Depth_t)); //Reset to all 0xFF (255, max depth) values.
-	for (unsigned int* ptr=topYMap; ptr<(topYMap+framebuffer.resolution.x); ptr++) {*ptr = framebuffer.resolution.y; /* Set to all [resY] values. */}
-	for (unsigned int* ptr=topYMapOld; ptr<(topYMapOld+framebuffer.resolution.x); ptr++) {*ptr = framebuffer.resolution.y; /* Set to all [resY] values. */}
+	for (unsigned int index=0u; index<framebuffer.resolution.x; index++) {
+		//Set to all [resY] values.
+		topYMap[index] = framebuffer.resolution.y;
+		topYMapOld[index] = framebuffer.resolution.y;
+	}
 }
 
 
 Depth_t r_mapDepth(float depthF) {
 	float t = log(depthF / camera.near) / log(camera.far / camera.near);
 	return (Depth_t)(
-		sqrtf(t) * 255.0f //Remap to 0-255.
+		CLAMP(t * 255.0f, 0.0f, 255.0f) //Remap to 0-255.
 	);
 }
 
@@ -176,8 +179,8 @@ int r_getCentreX(const Vec2f_t position) {
 	float theta = atan2(direction.x, direction.y);
 	float angleDelta = theta - camera.yaw;
 
-	while (angleDelta >  M_PI) angleDelta -= 2.0f * M_PI;
-	while (angleDelta < -M_PI) angleDelta += 2.0f * M_PI;
+	while (angleDelta >  M_PI) {angleDelta -= 2.0f * M_PI;}
+	while (angleDelta < -M_PI) {angleDelta += 2.0f * M_PI;}
 
 	float centreX = ((float)(framebuffer.resolution.x) / 2.0f) * ((angleDelta * 2.0f / camera.FOV) + 1.0f);
 	return (int)(centreX);
@@ -306,8 +309,8 @@ void r_drawPortalColumn(
 		nearSector, invDistance, &lowYBoundNearUnclamp, &topYBoundNearUnclamp
 	);
 	if ((topYBoundNearUnclamp<minYBound) || (lowYBoundNearUnclamp>=maxYBound)) {return; /* Completely offscreen vertically. */}
-	int lowYBoundNear = fmax(lowYBoundNearUnclamp, minYBound);
-	int topYBoundNear = fmin(topYBoundNearUnclamp, maxYBound);
+	int lowYBoundNear = CLAMP(lowYBoundNearUnclamp, minYBound, maxYBound);
+	int topYBoundNear = CLAMP(topYBoundNearUnclamp, minYBound, maxYBound);
 
 	//Far sector's projections;
 	int lowYBoundFarUnclamp, topYBoundFarUnclamp;
@@ -315,9 +318,8 @@ void r_drawPortalColumn(
 	r_getLineDefSectorProjections(
 		farSector, invDistance, &lowYBoundFarUnclamp, &topYBoundFarUnclamp
 	);
-	if ((topYBoundFarUnclamp<minYBound) || (lowYBoundFarUnclamp>=maxYBound)) {return; /* Completely offscreen vertically. */}
-	int lowYBoundFar = fmax(lowYBoundFarUnclamp, minYBound);
-	int topYBoundFar = fmin(topYBoundFarUnclamp, maxYBound);
+	int lowYBoundFar = CLAMP(lowYBoundFarUnclamp, minYBound, maxYBound);
+	int topYBoundFar = CLAMP(topYBoundFarUnclamp, minYBound, maxYBound);
 
 
 	int yLow = fmin(lowYBoundNear, lowYBoundFar);
@@ -360,7 +362,7 @@ void r_drawPortalColumn(
 	RGB_t* texPTR;
 
 	if (!r_getColumn(textureID, textureX, &texPTR)) {return;}
-	if (lowYBoundNear < lowYBoundFar) {
+	if (lowYBoundNear <= lowYBoundFar) {
 		//Draw a connecting wall between them and fill Y fill data.
 		lowYMap[screenX] = lowYBoundFar;
 		ptr = fbPTR + screenX + (framebuffer.resolution.x * lowYBoundNear);
@@ -379,7 +381,7 @@ void r_drawPortalColumn(
 
 
 	//Draw the upper (Y value, lower onscreen) section of the portal
-	if (topYBoundNear > topYBoundFar) {
+	if (topYBoundNear >= topYBoundFar) {
 		//Draw a connecting wall between them and fill Y fill data.
 		topYMap[screenX] = topYBoundFar;
 		ptr = fbPTR + screenX + (framebuffer.resolution.x * topYBoundFar);
@@ -498,70 +500,74 @@ void r_drawSpan(const PlaneSpan_t* thisSpan, RGB_t* fbPTR, const float aspectRat
 	if (thisSpan->row >= framebuffer.resolution.y) {return;}
 
 
-#ifdef PLANE_SPAN_TEXTURING 
-	float tStart = (float)(xStart) / (float)(framebuffer.resolution.x);
-	float tEnd = (float)(xEnd) / (float)(framebuffer.resolution.x);
-	float HALF_FOV = camera.FOV/2.0f;
-	float aStart = f_lerp(-HALF_FOV, HALF_FOV, tStart) + camera.yaw;
-	float aEnd = f_lerp(-HALF_FOV, HALF_FOV, tEnd) + camera.yaw;
-
-
-	float floorDistance; float ceilDistance;
 	Sector_t* thisSector = thisSpan->sector;
-	r_inverseDistanceProjections(
-		thisSector, aspectRatio,
-		thisSpan->row, thisSpan->row,
-		&ceilDistance, &floorDistance
-	);
+	if (
+		(thisSpan->isFloor && (thisSector->flags & 0x1)) || //If floor and floor textured
+		(!thisSpan->isFloor && (thisSector->flags & 0x2)) //If ceiling and ceiling textured
+	) {
+		float tStart = (float)(xStart) / (float)(framebuffer.resolution.x);
+		float tEnd = (float)(xEnd) / (float)(framebuffer.resolution.x);
+		float HALF_FOV = camera.FOV/2.0f;
+		float aStart = f_lerp(-HALF_FOV, HALF_FOV, tStart) + camera.yaw;
+		float aEnd = f_lerp(-HALF_FOV, HALF_FOV, tEnd) + camera.yaw;
 
-	Vec2f_t startDelta = (Vec2f_t) {
-		.x=sin(aStart), .y=cos(aStart)
-	};
-	Vec2f_t endDelta = (Vec2f_t) {
-		.x=sin(aEnd), .y=cos(aEnd)
-	};
 
-	unsigned int spanTexture;
-	if (thisSpan->isFloor) {
-		//isFloor
-		startDelta = v2f_mul(startDelta, floorDistance);
-		endDelta = v2f_mul(endDelta, floorDistance);
-		spanTexture = thisSector->floorTexture;
+		float floorDistance; float ceilDistance;
+		r_inverseDistanceProjections(
+			thisSector, aspectRatio,
+			thisSpan->row, thisSpan->row,
+			&ceilDistance, &floorDistance
+		);
+
+		Vec2f_t startDelta = (Vec2f_t) {
+			.x=sin(aStart), .y=cos(aStart)
+		};
+		Vec2f_t endDelta = (Vec2f_t) {
+			.x=sin(aEnd), .y=cos(aEnd)
+		};
+
+		unsigned int spanTexture;
+		if (thisSpan->isFloor) {
+			//isFloor
+			startDelta = v2f_mul(startDelta, floorDistance);
+			endDelta = v2f_mul(endDelta, floorDistance);
+			spanTexture = thisSector->floorTexture;
+
+		} else {
+			//isCeiling
+			startDelta = v2f_mul(startDelta, ceilDistance);
+			endDelta = v2f_mul(endDelta, ceilDistance);
+			spanTexture = thisSector->ceilingTexture;
+		}
+
+		Vec2f_t startPosition = v2f_add(camera.position, startDelta);
+		Vec2f_t endPosition = v2f_add(camera.position, endDelta);
+
+		Vec2f_t startUV = v2f_add(v2f_div(startPosition, PLANE_UV_SCALE), PLANE_UV_OFFSET);
+		Vec2f_t endUV = v2f_add(v2f_div(endPosition, PLANE_UV_SCALE), PLANE_UV_OFFSET);
+
+
+		RGB_t* rowStartPtr = fbPTR + (thisSpan->row * framebuffer.resolution.x);
+		for (unsigned int screenX=xStart; screenX<=xEnd; screenX++) {
+			float t = (float)(screenX - xStart) / (float)(xEnd - xStart);
+			Vec2f_t interpUV = v2f_fract(v2f_lerp(startUV, endUV, t));
+			Vec2i_t uvInt = (Vec2i_t){
+				.x=(int)(fabsf(interpUV.x * TEXTURE_RESOLUTION.x)) % TEXTURE_RESOLUTION.x,
+				.y=(int)(fabsf(interpUV.y * TEXTURE_RESOLUTION.y)) % TEXTURE_RESOLUTION.y
+			};
+			RGB_t* texColour = (textures[spanTexture] + (uvInt.x * TEXTURE_RESOLUTION.y)) + uvInt.y;
+			*(rowStartPtr + screenX) = rgb_fetch(*texColour, thisSector->lightLevel);
+		}
 
 	} else {
-		//isCeiling
-		startDelta = v2f_mul(startDelta, ceilDistance);
-		endDelta = v2f_mul(endDelta, ceilDistance);
-		spanTexture = thisSector->ceilingTexture;
+
+		RGB_t thisColour = (thisSpan->isFloor) ? thisSector->floorColour : thisSector->ceilingColour;
+		RGB_t* rowStartPtr = fbPTR + (thisSpan->row * framebuffer.resolution.x);
+		for (unsigned int screenX=xStart; screenX<=xEnd; screenX++) {
+			*(rowStartPtr + screenX) = rgb_fetch(thisColour, thisSector->lightLevel);
+		}
+
 	}
-
-	Vec2f_t startPosition = v2f_add(camera.position, startDelta);
-	Vec2f_t endPosition = v2f_add(camera.position, endDelta);
-
-	Vec2f_t startUV = v2f_add(v2f_div(startPosition, PLANE_UV_SCALE), PLANE_UV_OFFSET);
-	Vec2f_t endUV = v2f_add(v2f_div(endPosition, PLANE_UV_SCALE), PLANE_UV_OFFSET);
-
-
-	RGB_t* rowStartPtr = fbPTR + (thisSpan->row * framebuffer.resolution.x);
-	for (unsigned int screenX=xStart; screenX<=xEnd; screenX++) {
-		float t = (float)(screenX - xStart) / (float)(xEnd - xStart);
-		Vec2f_t interpUV = v2f_fract(v2f_lerp(startUV, endUV, t));
-		Vec2i_t uvInt = (Vec2i_t){
-			.x=(int)(fabsf(interpUV.x * TEXTURE_RESOLUTION.x)) % TEXTURE_RESOLUTION.x,
-			.y=(int)(fabsf(interpUV.y * TEXTURE_RESOLUTION.y)) % TEXTURE_RESOLUTION.y
-		};
-		RGB_t* texColour = (textures[spanTexture] + (uvInt.x * TEXTURE_RESOLUTION.y)) + uvInt.y;
-		*(rowStartPtr + screenX) = rgb_fetch(*texColour, thisSector->lightLevel);
-	}
-#else
-
-	RGB_t thisColour = (thisSpan->isFloor) ? thisSpan->sector->floorColour : thisSpan->sector->ceilingColour;
-	RGB_t* rowStartPtr = fbPTR + (thisSpan->row * framebuffer.resolution.x);
-	for (unsigned int screenX=xStart; screenX<=xEnd; screenX++) {
-		*(rowStartPtr + screenX) = rgb_fetch(thisColour, thisSpan->sector->lightLevel);
-	}
-
-#endif
 }
 
 
