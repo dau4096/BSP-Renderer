@@ -245,17 +245,20 @@ int l_getSectors(const xmlNode* root) {
 		l_getLineDefsArrayAttr(geoIndex-g_sectors, &lineDefsArr, &numLineDefs);
 
 
-	#ifdef PLANE_SPAN_TEXTURING
 		const char* floorTextureName = l_getStrAttr(secNode, "floorTexture");
 		const char* ceilTextureName = l_getStrAttr(secNode, "ceilTexture");
-
-		int floorSuccess, ceilSuccess;
-		const RGB_t floorColour = l_getColourAttr(secNode, "floorColour", RGB_MAGENTA);
-		const RGB_t ceilColour = l_getColourAttr(secNode, "ceilColour", RGB_CYAN);
 		const uint8_t flags =  (
 			((floorTextureName) ? 1u : 0u) | //Bit 0: floor colour/texture
 			((ceilTextureName ? 1u : 0u) << 1) //Bit 1: ceil colour/texture
 		);
+
+	#ifndef PLANE_SPAN_TEXTURING
+		flags &= 0xFC; //Ignore last 2 bits (For choosing texture or coloured ceil/floor. Thus, always untextured.)
+	#endif
+
+		int floorSuccess, ceilSuccess;
+		const RGB_t floorColour = l_getColourAttr(secNode, "floorColour", RGB_MAGENTA);
+		const RGB_t ceilColour = l_getColourAttr(secNode, "ceilColour", RGB_CYAN);
 
 		*(geoIndex++) = (Sector_t){
 			.floorHeight=l_getFloatAttr(secNode, "floorZ", -1.0f),
@@ -271,24 +274,6 @@ int l_getSectors(const xmlNode* root) {
 			.lineDefs=lineDefsArr, .numLineDefs=numLineDefs,
 			.lightLevel=l_getUIntAttr(secNode, "lightLevel", 255u)
 		};
-
-	#else
-
-		*(geoIndex++) = (Sector_t){
-			.floorHeight=l_getFloatAttr(secNode, "floorZ", -1.0f),
-			.floorColour=l_getColourAttr(secNode, "floorColour", RGB_MAGENTA),
-			.floorTexture=fallbackTextureIndex,
-
-			.ceilingHeight=l_getFloatAttr(secNode, "ceilZ", 1.0f),
-			.ceilingColour=l_getColourAttr(secNode, "ceilColour", RGB_CYAN),
-			.ceilingTexture=fallbackTextureIndex,
-
-			.flags=0b0000000,
-
-			.lineDefs=lineDefsArr, .numLineDefs=numLineDefs,
-			.lightLevel=l_getUIntAttr(secNode, "lightLevel", 255u)
-		};
-	#endif
 	}
 
 	return TRUE;
