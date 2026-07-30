@@ -37,7 +37,7 @@ void r_reallocColumnBuffers(void);
 
 //////// DRAWING ////////
 int r_getCentreX(const Vec2f_t position);
-
+float r_getLineDefDistance(const LineDef_t* thisLineDef, const Vec2f_t position);
 void r_drawFrame(void);
 //////// DRAWING ////////
 

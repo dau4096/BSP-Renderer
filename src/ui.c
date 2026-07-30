@@ -27,16 +27,14 @@ void ui_drawDebugValues(const Vec2i_t resolution, const int uiHeight) {
 
 #ifdef DEBUG_DRAW_ORDER
 	printf( //3rd line : Physics information & Debug
-		"Floor: [%s]    Portal: [%s]    Drawn-LDs: [%u]\n",
+		"Floor: [%s]    Drawn-LDs: [%u]\n",
 		((isOnFloor) ? "TRUE " : "FALSE"),
-		((isInPortal) ? "TRUE " : "FALSE"),
 		g_numLineDefs-currentDrawNumber
 	);
 #else
 	printf( //3rd line : Physics information
-		"Floor: [%s]    Portal: [%s]\n",
-		((isOnFloor) ? "TRUE " : "FALSE"),
-		((isInPortal) ? "TRUE " : "FALSE")
+		"Floor: [%s]\n",
+		((isOnFloor) ? "TRUE " : "FALSE")
 	);
 #endif
 

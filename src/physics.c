@@ -14,13 +14,13 @@
 #define CAMERA_HEAD_OFFSET    0.100f /* Z offset of cameraZ to top of camera (top of "head") */
 #define CAMERA_HIT_RADIUS     0.250f /* Cylindrical collision: radius. */
 #define CAMERA_PORTAL_RADIUS  0.125f /* Radius at which portals are allowed to swap sectors. */
-#define CAMERA_MAX_STEP       0.500f /* Maximum Z-delta the camera is allowed to step up. */
+#define CAMERA_MAX_STEP       0.600f /* Maximum Z-delta the camera is allowed to step up. */
 
 #define MOVEMENT_SPEED_BASE 2.0f /* In units/second */
 #define TURNING_SPEED 2.75f/* In radians/second */
 #define JUMP_SPEED 0.25f /* 1-time impulse */
 
-#define GRAVITY -0.1f /* Gravity acceleration in units/second² */
+#define GRAVITY -0.5f /* Gravity acceleration in units/second² */
 #define EPSILON 1.0e-5f /* For FP-precision reasons */
 //////// CONSTANTS ////////
 
@@ -32,35 +32,22 @@ typedef struct {Vec2f_t start, end, delta;} Movement_t; //Contains info about th
 
 
 //Check if LD is a portal or a solid wall.
-int p_isLineDefSolid(const LineDef_t* thisLineDef) {return (thisLineDef->frontSector == -1) || (thisLineDef->backSector == -1);}
+int p_isLineDefSolid(const LineDef_t* thisLineDef) {return (thisLineDef->backSector == -1);}
 
 
-int p_circleLineIntersect(
-	const Vec2f_t start, const Vec2f_t end,
-	const Vec2f_t circlePosition, const float radius,
-	float* distToLine
+int p_cameraLineDefIntersect(
+	const LineDef_t* thisLineDef, const Vec2f_t position, const float radius, float* distToLine
 ) {
-	Vec2f_t lineDir = v2f_sub(end, start);
-	Vec2f_t lineToCircle = v2f_sub(circlePosition, start);
-
-	float t = v2f_dot(lineToCircle, lineDir) / v2f_lenSQ(lineDir);
-	t = CLAMP(t, 0.0f, 1.0f);
-
-	Vec2f_t closestPoint = v2f_add(start, v2f_mul(lineDir, t));
-	float distToCircle = v2f_dist(circlePosition, closestPoint);
-
-	if (distToLine) {
-		*distToLine = distToCircle;
-	}
-	return distToCircle <= radius;
+	*distToLine = r_getLineDefDistance(thisLineDef, position); //Use graphics func to get dist.
+	return (*distToLine <= radius); //If within radius of line, must be touching/overlapping.
 }
 
 
-int p_getLDintersect(LineDef_t* thisLineDef, const Movement_t* motion, float* intersectDistance) {
+int p_getLDintersect(const LineDef_t* thisLineDef, const Movement_t* motion, float* intersectDistance) {
 	//Get the intersect between a LD and some movement.
-	//Camera is modelled as a cylinder, so anything within (radius) is an intersect.
-	Vec2f_t start = g_vertices[thisLineDef->vStart];
-	Vec2f_t end = g_vertices[thisLineDef->vEnd];
+	//Camera is modelled as a 2D capsule, so anything within (radius) is an intersect.
+	const Vec2f_t start = g_vertices[thisLineDef->vStart];
+	const Vec2f_t end = g_vertices[thisLineDef->vEnd];
 
 	//Check the ends;
 	float dMeLDs = v2f_dist(motion->end,   start);
@@ -83,7 +70,7 @@ int p_getLDintersect(LineDef_t* thisLineDef, const Movement_t* motion, float* in
 			.start=motion->start, .end=v2f_add(motion->start, delta), .delta=delta
 		};
 
-		if (p_circleLineIntersect(start, end, submotion.end, CAMERA_HIT_RADIUS, intersectDistance)) {
+		if (p_cameraLineDefIntersect(thisLineDef, submotion.end, CAMERA_HIT_RADIUS, intersectDistance)) {
 			//Must have hit somewhere along the line.
 			return TRUE;
 		}
@@ -93,11 +80,12 @@ int p_getLDintersect(LineDef_t* thisLineDef, const Movement_t* motion, float* in
 }
 
 
+int p_movementDidCrossLD(const LineDef_t* thisLineDef, const Movement_t* motion) {
+	//Check if actual motion vector crosses LD.
+	Vec2f_t ldStart = g_vertices[thisLineDef->vStart];
+	Vec2f_t ldEnd = g_vertices[thisLineDef->vEnd];
 
-Sector_t* p_findCurrentSectorSlow(Camera_t* camera) {
-	//Find for sure which sector the camera is in.
-	//Slower than the below method of tracking "state", but more certain.
-	//TBA at some point.
+	Vec2f_t mStart = motion->start;
 }
 
 
@@ -105,7 +93,6 @@ Sector_t* p_findCurrentSectorSlow(Camera_t* camera) {
 
 
 unsigned int currentSectorID = 0u; //Init at 0, maybe add some checking later for where to start.
-int isInPortal = FALSE;
 int p_getSectorID(
 	const Camera_t* camera, Sector_t** currentSector, Movement_t* motion
 ) { //Returns whether or not a linedef was hit.
@@ -154,7 +141,6 @@ int p_getSectorID(
 				//Can walk through, change to new sector.
 				currentSectorID = newSectorID;
 				thisSector = newSector;
-				isInPortal = TRUE;
 			}
 		}
 
@@ -175,7 +161,7 @@ int p_getSectorID(
 
 
 	*currentSector = thisSector;
-	if (!hitLineDef) {isInPortal=FALSE; return FALSE;}
+	if (!hitLineDef) {return FALSE;}
 
 
 	return TRUE;

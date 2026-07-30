@@ -758,8 +758,8 @@ void r_drawLineDef(const LineDef_t* thisLineDef, RGB_t* fbPTR) {
 
 
 
-float r_getLineDefDistance(const LineDef_t* thisLineDef) {
-	//Get distance from camera.
+float r_getLineDefDistance(const LineDef_t* thisLineDef, const Vec2f_t position) {
+	//Get distance from given position.
 	Vec2f_t start = g_vertices[thisLineDef->vStart];
 	Vec2f_t end = g_vertices[thisLineDef->vEnd];
 
@@ -768,13 +768,13 @@ float r_getLineDefDistance(const LineDef_t* thisLineDef) {
 	dir = v2f_div(dir, dirLen); //Normalise
 	Vec2f_t normal = (Vec2f_t){.x=-dir.y, .y=dir.x};
 
-	Vec2f_t delta = v2f_sub(camera.position, start);
+	Vec2f_t delta = v2f_sub(position, start);
 	float projD = v2f_dot(delta, dir);
 	float projN = v2f_dot(delta, normal);
 
-	if (projD < 0.0f) {return v2f_len(delta);}
-	else if (projD > dirLen) {return v2f_dist(camera.position, end);}
-	else {return fabsf(projN);}
+	if (projD < 0.0f) {return v2f_len(delta); /* Distance to [start] */}
+	else if (projD > dirLen) {return v2f_dist(position, end); /* Distance to [end] */}
+	else {return fabsf(projN); /* Distance of [projection] (Perpendicular to lineDefinition) */}
 }
 
 
@@ -800,7 +800,7 @@ void r_sortLineDefs(
 		if (!(thisLineDef->isValid)) {continue;}
 		(*numValidLineDefs)++;
 		sorts[numSorts++] = (LineDefSort_t){
-			.distance=fabsf(r_getLineDefDistance(thisLineDef)),
+			.distance=fabsf(r_getLineDefDistance(thisLineDef, camera.position)),
 			.lineDef=thisLineDef
 		};
 	}

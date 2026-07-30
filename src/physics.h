@@ -7,7 +7,6 @@
 
 //////// DATA ////////
 extern unsigned int currentSectorID;
-extern int isInPortal;
 extern int isOnFloor;
 //////// DATA ////////
 
