@@ -495,12 +495,14 @@ int r_clipLDVertices(Vec2f_t* start, Vec2f_t* end, float* startT, float* endT) {
 
 void r_drawSpan(const PlaneSpan_t* thisSpan, RGB_t* fbPTR, const float aspectRatio) {
 	//Draws horizontal span of floor/ceiling, textured.
+	if (!thisSpan->active) {return; /* Invalid! */}
+
 	unsigned int xStart = CLAMP(thisSpan->xStart, 0u, framebuffer.resolution.x-1u);
 	unsigned int xEnd = CLAMP(thisSpan->xEnd, 0u, framebuffer.resolution.x-1u);
 	if (thisSpan->row >= framebuffer.resolution.y) {return;}
 
 
-	Sector_t* thisSector = thisSpan->sector;
+	const Sector_t* thisSector = thisSpan->sector;
 	if (
 		(thisSpan->isFloor && (thisSector->flags & 0x1)) || //If floor and floor textured
 		(!thisSpan->isFloor && (thisSector->flags & 0x2)) //If ceiling and ceiling textured
@@ -561,10 +563,13 @@ void r_drawSpan(const PlaneSpan_t* thisSpan, RGB_t* fbPTR, const float aspectRat
 
 	} else {
 
-		RGB_t thisColour = (thisSpan->isFloor) ? thisSector->floorColour : thisSector->ceilingColour;
+		RGB_t thisColour = rgb_fetch(
+			(thisSpan->isFloor) ? thisSector->floorColour : thisSector->ceilingColour,
+			thisSector->lightLevel
+		);
 		RGB_t* rowStartPtr = fbPTR + (thisSpan->row * framebuffer.resolution.x);
 		for (unsigned int screenX=xStart; screenX<=xEnd; screenX++) {
-			*(rowStartPtr + screenX) = rgb_fetch(thisColour, thisSector->lightLevel);
+			*(rowStartPtr + screenX) = thisColour;
 		}
 
 	}
@@ -694,11 +699,12 @@ void r_drawLineDef(const LineDef_t* thisLineDef, RGB_t* fbPTR) {
 
 
 	//Find every floor span for every row.
-	Sector_t* thisSector = (g_sectors+closeSectorID);
+	const Sector_t* thisSector = (g_sectors+closeSectorID);
 	PlaneSpan_t currentSpan;
 	currentSpan.active = FALSE;
 	//Only checks in X and Y range that couldve been modified.
 	for (unsigned int row=lowestPossibleSpan; row<highestPossibleSpan; row++) {
+
 		for (unsigned int column=leftMostClamp; column<=rightMostClamp; column++) {
 			//Only search the area acctually modified by the linedef drawing loop above
 			int columnDidChange = !(

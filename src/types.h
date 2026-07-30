@@ -37,12 +37,6 @@ typedef struct {
 
 //Geometry
 typedef struct {
-	int valid;
-	RGB_t* data;
-	Vec2i_t resolution;
-} Buffer_t;
-
-typedef struct {
 	unsigned int vStart;      //Start vertex ID
 	unsigned int vEnd;       //End vertex ID
 	int frontSector;        //Sector ID this LineDef_t belongs to
@@ -51,6 +45,7 @@ typedef struct {
 						 //
 	int isValid;        //Was it created correctly?
 } LineDef_t;
+
 
 typedef struct {
 	float floorHeight; unsigned int floorTexture; RGB_t floorColour; //Floor data
@@ -65,6 +60,13 @@ typedef struct {
 
 //Rendering only
 typedef struct {
+	int valid;
+	RGB_t* data;
+	Vec2i_t resolution;
+} Buffer_t;
+
+
+typedef struct {
 	float distance;
 	LineDef_t* lineDef;
 } LineDefSort_t;
@@ -75,7 +77,7 @@ typedef struct {
 	unsigned int xStart;
 	unsigned int xEnd;
 
-	Sector_t* sector;
+	const Sector_t* sector;
 	int isFloor; //Is it using floor data or ceiling data from ^^ ptr.
 
 	int active; //Is this span currently being used or not?

@@ -8,3 +8,4 @@
 *.dll
 
 gmon.out
+perf.data*

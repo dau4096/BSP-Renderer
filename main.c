@@ -16,7 +16,6 @@
 
 
 
-
 volatile sig_atomic_t run = 1;
 void signalHandler(int sig) {
 	//^C interrupt caught. Fallback for no IO.
@@ -87,9 +86,6 @@ int main(int argc, char* argv[]) {
 		t_deleteFramebuffer();
 		return -1;
 	}
-
-
-
 
 
 
