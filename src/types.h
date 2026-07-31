@@ -61,8 +61,10 @@ typedef struct {
 //Rendering only
 typedef struct {
 	int valid;
-	RGB_t* data;
-	Vec2i_t resolution;
+	RGB_t* frontData;
+	RGB_t* backData;
+	Vec2i_t resolutionPX; //Resolution (Pixels)
+	Vec2i_t resolutionCHARS; //Resolution (Characters)
 } Buffer_t;
 
 

@@ -15,7 +15,7 @@ Vec2i_t t_getTerminalSize(void);
 
 
 //////// INITIALISATION ////////
-void t_createFramebuffer(const Vec2i_t resolution);
+void t_createFramebuffer(const Vec2i_t resolutionChars);
 RGB_t* t_getFramebufferPTR(void);
 void t_deleteFramebuffer(void);
 //////// INITIALISATION ////////
@@ -33,6 +33,7 @@ void t_resetCursor(void);
 void t_drawFramebuffer(void);
 void t_clearFramebuffer(void);
 void t_fillFramebuffer(const RGB_t colour);
+void t_swapBuffers(void);
 //////// FRAMEBUFFER ////////
 
 

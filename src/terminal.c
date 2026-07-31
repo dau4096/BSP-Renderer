@@ -9,10 +9,12 @@
 
 #include "types.h"
 #include "maths.h"
+#include "ui.h"
 
 
 
 Buffer_t framebuffer;
+
 
 
 
@@ -59,26 +61,33 @@ Vec2i_t t_getTerminalSize(void) {
 
 //////// FRAMEBUFFER ////////
 //////// INITIALISATION ////////
-void t_createFramebuffer(const Vec2i_t resolution) {
+void t_createFramebuffer(const Vec2i_t resolutionChars) {
 	//Overwrites the current instance of framebuffer (if valid) with a new FB.
+	
+	Vec2i_t resolution = (Vec2i_t){resolutionChars.x, resolutionChars.y*2};
 	if ((resolution.x <= 0.0f) || (resolution.y <= 0.0f)) {return; /* Invalid resize */}
 
 	if (framebuffer.valid) {
 		//Currently has an active framebuffer, free old memory.
-		free(framebuffer.data);
+		free(framebuffer.frontData);
+		free(framebuffer.backData);
 	}
 
-	framebuffer.resolution = resolution;
-	framebuffer.data = calloc((int)(resolution.x * resolution.y), sizeof(RGB_t)); //allocate.
-	framebuffer.valid = (framebuffer.data != NULL);
+	framebuffer.resolutionPX = resolution;
+	framebuffer.resolutionCHARS = resolutionChars;
+	framebuffer.frontData = calloc((int)(resolution.x * resolution.y), sizeof(RGB_t)); //allocate.
+	framebuffer.backData = calloc((int)(resolution.x * resolution.y), sizeof(RGB_t)); //allocate.
+	framebuffer.valid = (framebuffer.frontData != NULL) && (framebuffer.backData != NULL);
 }
 
-RGB_t* t_getFramebufferPTR(void) {return framebuffer.data;}
+RGB_t* t_getFramebufferPTR(void) {return framebuffer.frontData;}
 
 void t_deleteFramebuffer(void) {
 	if (!framebuffer.valid) {return; /* Already deleted. */}
-	free(framebuffer.data);
-	framebuffer.resolution = (Vec2i_t){0, 0};
+	free(framebuffer.frontData);
+	free(framebuffer.backData);
+	framebuffer.resolutionPX = (Vec2i_t){0, 0};
+	framebuffer.resolutionCHARS = (Vec2i_t){0, 0};
 	framebuffer.valid = FALSE;
 }
 //////// INITIALISATION ////////
@@ -92,15 +101,15 @@ void t_writePX(const Vec2i_t position, RGB_t colour) {
 	if (!framebuffer.valid) {return;}
 	if (
 		(position.x < 0.0f) || (position.y < 0.0f) ||
-		(position.x >= framebuffer.resolution.x) ||
-		(position.y >= framebuffer.resolution.y)
+		(position.x >= framebuffer.resolutionPX.x) ||
+		(position.y >= framebuffer.resolutionPX.y)
 	) {
 		return; //Out of the FB.
 	}
 
 	rgb_quantise(&colour);
 
-	framebuffer.data[(int)((position.y * framebuffer.resolution.x) + position.x)] = colour;
+	framebuffer.frontData[(int)((position.y * framebuffer.resolutionPX.x) + position.x)] = colour;
 }
 
 
@@ -108,13 +117,13 @@ RGB_t t_readPX(const Vec2i_t position) {
 	if (!framebuffer.valid) {return (RGB_t){0u, 0u, 0u};}
 	if (
 		(position.x < 0.0f) || (position.y < 0.0f) ||
-		(position.x >= framebuffer.resolution.x) ||
-		(position.y >= framebuffer.resolution.y)
+		(position.x >= framebuffer.resolutionPX.x) ||
+		(position.y >= framebuffer.resolutionPX.y)
 	) {
 		return (RGB_t){0u, 0u, 0u}; //Out of the FB.
 	}
 
-	return framebuffer.data[(int)((position.y * framebuffer.resolution.x) + position.x)];
+	return framebuffer.frontData[(int)((position.y * framebuffer.resolutionPX.x) + position.x)];
 }
 //////// DIRECT DRAW ////////
 
@@ -165,17 +174,26 @@ static inline char* setBackground(char *out, const RGB_t c) {
 
 
 
+void t_clearLowestNLines(unsigned int N) {
+	if (framebuffer.resolutionCHARS.y < N) {return;}
+	unsigned int startRow = framebuffer.resolutionCHARS.y - N + 1u;
+	printf("\033[%u;1H", startRow); //Move to first of bottom N lines
+    printf("\033[J"); //Clear then onward.
+}
+
+
 void t_resetCursor(void) {
+	t_clearLowestNLines(UI_HEIGHT);
 	printf("\x1b[1;1H"); //Moves cursor to the top-left.
 }
 
 
-#define WIDTH  (framebuffer.resolution.x)
-#define HEIGHT (framebuffer.resolution.y)
+#define WIDTH  (framebuffer.resolutionPX.x)
+#define HEIGHT (framebuffer.resolutionPX.y)
 void t_drawFramebuffer(void) {
 	if (!framebuffer.valid) {return; /* Invalid, Can't show. */}
 
-	size_t bufferSize = (size_t)(framebuffer.resolution.x * (framebuffer.resolution.y/2 + 1) * 64);
+	size_t bufferSize = (size_t)(framebuffer.resolutionPX.x * (framebuffer.resolutionPX.y/2 + 1) * 64);
 	char *buffer = malloc(bufferSize); //Start
 	char *out = buffer; //End
 
@@ -184,14 +202,14 @@ void t_drawFramebuffer(void) {
 	RGB_t lowPrev = RGB_BLACK;
 	int hasReset = TRUE; ///May not be accurate, force a colour change.
 
-	for (uint y=framebuffer.resolution.y-2; y>0u; y-=2u) {
-		for (uint x=0u; x<framebuffer.resolution.x; x++) {
+	for (uint y=framebuffer.resolutionPX.y-2; y>0u; y-=2u) {
+		for (uint x=0u; x<framebuffer.resolutionPX.x; x++) {
 
-			int topIndex = (y * framebuffer.resolution.x) + x;
-			int lowIndex = ((y + 1) * framebuffer.resolution.x) + x;
+			int topIndex = (y * framebuffer.resolutionPX.x) + x;
+			int lowIndex = ((y + 1) * framebuffer.resolutionPX.x) + x;
 
-			RGB_t top = (y + 1 < framebuffer.resolution.y) ? framebuffer.data[lowIndex] : RGB_BLACK;
-			RGB_t low = framebuffer.data[topIndex];
+			RGB_t top = (y + 1 < framebuffer.resolutionPX.y) ? framebuffer.backData[lowIndex] : RGB_BLACK;
+			RGB_t low = framebuffer.backData[topIndex];
 
 
 			//Check if the colour needs to change.
@@ -224,15 +242,23 @@ void t_drawFramebuffer(void) {
 
 void t_clearFramebuffer(void) {
 	//Fills with black, slightly quicker than the loop method.
-	memset(framebuffer.data, 0x00u, (framebuffer.resolution.x * framebuffer.resolution.y) * sizeof(RGB_t));
+	memset(framebuffer.frontData, 0x00u, (framebuffer.resolutionPX.x * framebuffer.resolutionPX.y) * sizeof(RGB_t));
 }
+
 
 void t_fillFramebuffer(RGB_t colour) {
 	//Fill with single colour.
 	//Compiler (hopefully) optimises this nicer!
-	RGB_t* end = framebuffer.data + (framebuffer.resolution.x * framebuffer.resolution.y);
-	for (RGB_t* ptr=framebuffer.data; ptr<end; ptr++) {
+	RGB_t* end = framebuffer.frontData + (framebuffer.resolutionPX.x * framebuffer.resolutionPX.y);
+	for (RGB_t* ptr=framebuffer.frontData; ptr<end; ptr++) {
 		*ptr = colour;
 	}
+}
+
+
+void t_swapBuffers(void) {
+	RGB_t* temporary = framebuffer.backData;
+	framebuffer.backData = framebuffer.frontData;
+	framebuffer.frontData = temporary;
 }
 //////// FRAMEBUFFER ////////

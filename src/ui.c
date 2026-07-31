@@ -9,6 +9,19 @@
 #include "physics.h"
 
 
+
+
+#ifdef DEBUG_VALUES
+//Shows generic debug values instead of a UI.
+unsigned int UI_HEIGHT = 4u;
+
+#else
+//Will be used later to add a UI bar at the bottom.
+unsigned int UI_HEIGHT = 5u;
+#endif
+
+
+
 void ui_drawDebugValues(const Vec2i_t resolution, const int uiHeight) {
 	//Purely for debugging. No decoration.
 	printf( //1st line : Camera information

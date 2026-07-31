@@ -4,6 +4,8 @@
 
 
 //////// INTERFACE ////////
+extern unsigned int UI_HEIGHT;
+
 void ui_drawInterface(const Vec2i_t resolution, const int uiHeight);
 //////// INTERFACE ////////
 

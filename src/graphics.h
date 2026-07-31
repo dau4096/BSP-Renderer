@@ -14,7 +14,6 @@ extern unsigned int fallbackTextureIndex;
 extern Camera_t* r_camera;
 
 
-//Placeholder values; replace with calloc() heap stuff later.
 extern unsigned int g_numVertices;
 extern unsigned int g_numLineDefs;
 extern unsigned int g_numSectors;

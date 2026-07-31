@@ -5,14 +5,19 @@
 #include <time.h>
 #include <math.h>
 #include <string.h>
+#include <pthread.h>
 
 #include "src/types.h"
-#include "src/terminal.h"
 #include "src/io.h"
 #include "src/loader.h"
+#include "src/terminal.h"
 #include "src/graphics.h"
-#include "src/physics.h"
 #include "src/ui.h"
+#include "src/multithread.h"
+#include "src/physics.h"
+
+
+
 
 
 
@@ -36,15 +41,6 @@ double now(void) {
 #endif
 
 
-#ifdef DEBUG_VALUES
-//Shows generic debug values instead of a UI.
-#define UI_HEIGHT 4u
-
-#else
-//Will be used later to add a UI bar at the bottom.
-#define UI_HEIGHT 5u
-#endif
-
 
 int main(int argc, char* argv[]) {
 	signal(SIGINT, signalHandler);
@@ -62,9 +58,7 @@ int main(int argc, char* argv[]) {
 
 	Vec2i_t tResChars = t_getTerminalSize();
 	tResChars.y -= UI_HEIGHT + 2u; //Subtract 1 more, to let the command prompt onscreen.
-	Vec2i_t tResPX = (Vec2i_t){tResChars.x, tResChars.y*2};
-
-	t_createFramebuffer(tResPX); //Create framebuffer. (2D pixel data)
+	t_createFramebuffer(tResChars); //Create framebuffer. (2D pixel data)
 	r_reallocColumnBuffers(); //Create depthmap. (1D depth data)
 
 	int ioSuccess = io_init();
@@ -88,6 +82,11 @@ int main(int argc, char* argv[]) {
 	}
 
 
+	pthread_t terminalDrawThread;
+	if (!mt_createThread(mt_framebufferDrawLoop, &terminalDrawThread)) {
+		printf("Failed to create terminal output thread.");
+		return -1;
+	}
 
 
 	double start;
@@ -100,8 +99,7 @@ int main(int argc, char* argv[]) {
 		if ((newTResChars.x != tResChars.x) || (newTResChars.y != tResChars.y)) {
 			//Remake framebuffer to fit new res.
 			tResChars = newTResChars;
-			Vec2i_t tResPX = (Vec2i_t){tResChars.x, tResChars.y*2};
-			t_createFramebuffer(tResPX); //Remake framebuffer to the correct resolution.
+			t_createFramebuffer(tResChars); //Remake framebuffer to the correct resolution.
 			r_reallocColumnBuffers(); //Reallocate depthmap to the correct width.
 
 		} else {
@@ -123,18 +121,13 @@ int main(int argc, char* argv[]) {
 		r_drawFrame();
 		
 	#ifndef SUPPRESS_FRAMEBUFFER_OUTPUT
-		t_resetCursor();
-		t_drawFramebuffer();
+		mt_setDrawReady();
 	#endif
 		fflush(stdout);
 
-	#ifndef SUPPRESS_INTERFACE_OUTPUT
-		ui_drawInterface(tResChars, UI_HEIGHT);
-	#endif
-
 
 		dt = now() - start;
-		printf("Frame %d took: %.3lfms Theoretical FPS: ~%.0lf", frameNumber, dt*1000.0, 1.0 / dt); //Display real DT.
+		//printf("Frame %d took: %.3lfms Theoretical FPS: ~%.0lf", frameNumber, dt*1000.0, 1.0 / dt); //Display real DT. //Can't be shown ATM due to multithreading. !FIX!
 	#ifdef SUPPRESS_FRAMEBUFFER_OUTPUT
 		printf("\n");
 	#endif
@@ -156,6 +149,9 @@ int main(int argc, char* argv[]) {
 	} while (run && !(keyMapPress[K_QUIT]));
 	printf("\n");
 
+
+
+	mt_terminateThread(terminalDrawThread);
 	t_deleteFramebuffer();
 	io_quit();
 

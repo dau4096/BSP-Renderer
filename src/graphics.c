@@ -61,32 +61,32 @@ unsigned int* ceilYMap; //Contains ceiling extent data
 void r_reallocColumnBuffers(void) {
 	//If they exist, remove then remake.
 	if (lowYMap) {free(lowYMap);}
-	lowYMap = calloc(framebuffer.resolution.x, sizeof(unsigned int));
+	lowYMap = calloc(framebuffer.resolutionPX.x, sizeof(unsigned int));
 	if (lowYMapOld) {free(lowYMapOld);}
-	lowYMapOld = calloc(framebuffer.resolution.x, sizeof(unsigned int));
+	lowYMapOld = calloc(framebuffer.resolutionPX.x, sizeof(unsigned int));
 	if (floorYMap) {free(floorYMap);}
-	floorYMap = calloc(framebuffer.resolution.x, sizeof(unsigned int));
+	floorYMap = calloc(framebuffer.resolutionPX.x, sizeof(unsigned int));
 
 	if (depthMap) {free(depthMap);}
-	depthMap = calloc(framebuffer.resolution.x, sizeof(Depth_t));
+	depthMap = calloc(framebuffer.resolutionPX.x, sizeof(Depth_t));
 
 	if (topYMap) {free(topYMap);}
-	topYMap = calloc(framebuffer.resolution.x, sizeof(unsigned int));
+	topYMap = calloc(framebuffer.resolutionPX.x, sizeof(unsigned int));
 	if (topYMapOld) {free(topYMapOld);}
-	topYMapOld = calloc(framebuffer.resolution.x, sizeof(unsigned int));
+	topYMapOld = calloc(framebuffer.resolutionPX.x, sizeof(unsigned int));
 	if (ceilYMap) {free(ceilYMap);}
-	ceilYMap = calloc(framebuffer.resolution.x, sizeof(unsigned int));
+	ceilYMap = calloc(framebuffer.resolutionPX.x, sizeof(unsigned int));
 }
 
 
 void r_clearColumnBuffers() {
-	memset(lowYMap, (unsigned int)(0x00u), framebuffer.resolution.x * sizeof(unsigned int)); //Reset to all 0x00 (0px, bottom of the screen) values.
-	memset(lowYMapOld, (unsigned int)(0x00u), framebuffer.resolution.x * sizeof(unsigned int)); //Reset to all 0x00 (0px, bottom of the screen) values.
-	memset(depthMap, (Depth_t)(0xFFu), framebuffer.resolution.x * sizeof(Depth_t)); //Reset to all 0xFF (255, max depth) values.
-	for (unsigned int index=0u; index<framebuffer.resolution.x; index++) {
+	memset(lowYMap, (unsigned int)(0x00u), framebuffer.resolutionPX.x * sizeof(unsigned int)); //Reset to all 0x00 (0px, bottom of the screen) values.
+	memset(lowYMapOld, (unsigned int)(0x00u), framebuffer.resolutionPX.x * sizeof(unsigned int)); //Reset to all 0x00 (0px, bottom of the screen) values.
+	memset(depthMap, (Depth_t)(0xFFu), framebuffer.resolutionPX.x * sizeof(Depth_t)); //Reset to all 0xFF (255, max depth) values.
+	for (unsigned int index=0u; index<framebuffer.resolutionPX.x; index++) {
 		//Set to all [resY] values.
-		topYMap[index] = framebuffer.resolution.y;
-		topYMapOld[index] = framebuffer.resolution.y;
+		topYMap[index] = framebuffer.resolutionPX.y;
+		topYMapOld[index] = framebuffer.resolutionPX.y;
 	}
 }
 
@@ -182,7 +182,7 @@ int r_getCentreX(const Vec2f_t position) {
 	while (angleDelta >  M_PI) {angleDelta -= 2.0f * M_PI;}
 	while (angleDelta < -M_PI) {angleDelta += 2.0f * M_PI;}
 
-	float centreX = ((float)(framebuffer.resolution.x) / 2.0f) * ((angleDelta * 2.0f / camera.FOV) + 1.0f);
+	float centreX = ((float)(framebuffer.resolutionPX.x) / 2.0f) * ((angleDelta * 2.0f / camera.FOV) + 1.0f);
 	return (int)(centreX);
 }
 
@@ -193,8 +193,8 @@ void r_getLineDefSectorProjections(
 	float projectedYFloor = (camera.Z - thisSector->floorHeight) * invDistance;
 	float projectedYCeiling = (camera.Z - thisSector->ceilingHeight) * invDistance;
 
-	*lowY = (int)((float)(framebuffer.resolution.y) * (0.5f - projectedYFloor));
-	*topY = (int)((float)(framebuffer.resolution.y) * (0.5f - projectedYCeiling));
+	*lowY = (int)((float)(framebuffer.resolutionPX.y) * (0.5f - projectedYFloor));
+	*topY = (int)((float)(framebuffer.resolutionPX.y) * (0.5f - projectedYCeiling));
 }
 
 
@@ -205,8 +205,8 @@ float r_inverseDistanceProjections(
 	float* ceilDistance, float* floorDistance
 ) {
 	//Inverses r_getLineDefSectorProjections for top/bottom of screen.
-	float projectedYCeiling = 0.5f - (float)yTop / framebuffer.resolution.y;
-	float projectedYFloor = 0.5f - (float)yLow / framebuffer.resolution.y;
+	float projectedYCeiling = 0.5f - (float)yTop / framebuffer.resolutionPX.y;
+	float projectedYFloor = 0.5f - (float)yLow / framebuffer.resolutionPX.y;
 
 	//proj = (deltaZ * aspectRatio) / distance
 	//:. distance = (deltaZ * aspectRatio) / proj
@@ -264,22 +264,22 @@ void r_drawSolidColumn(
 
 #ifdef DEBUG_BORDERS
 	//Draw floor border.
-	*(fbPTR + screenX + (framebuffer.resolution.x * yLow)) = RGB_RED;
+	*(fbPTR + screenX + (framebuffer.resolutionPX.x * yLow)) = RGB_RED;
 
 	//Draw floor border.
-	*(fbPTR + screenX + (framebuffer.resolution.x * yTop)) = RGB_RED;
+	*(fbPTR + screenX + (framebuffer.resolutionPX.x * yTop)) = RGB_RED;
 
 #else
 
 	//Draws top-to-bottom vertically. (Image is flipped when drawing to console)
 	//Draw wall.
-	RGB_t* ptr = fbPTR + screenX + (framebuffer.resolution.x * yLow);
+	RGB_t* ptr = fbPTR + screenX + (framebuffer.resolutionPX.x * yLow);
 	RGB_t* texPTR;
 	if (!r_getColumn(textureID, textureX, &texPTR)) {return;}
 	for (int y=yLow; y<yTop; y++) {
 		float t = (float)(y - lowYBound) / (float)(topYBound - lowYBound);
 		*ptr = rgb_fetch(*(texPTR + (int)(t * (float)(TEXTURE_RESOLUTION.y))), thisSector->lightLevel);
-		ptr += framebuffer.resolution.x;
+		ptr += framebuffer.resolutionPX.x;
 	}
 	depthMap[screenX] = mappedDepth;
 #endif
@@ -332,26 +332,26 @@ void r_drawPortalColumn(
 	if (lowYBoundNear < lowYBoundFar) {
 		//Draw a connecting wall between them and fill Y fill data.
 		lowYMap[screenX] = lowYBoundFar;
-		*(fbPTR + screenX + (framebuffer.resolution.x * lowYBoundFar)) = RGB_MAGENTA;
-		*(fbPTR + screenX + (framebuffer.resolution.x * lowYBoundNear)) = RGB_BLUE;
+		*(fbPTR + screenX + (framebuffer.resolutionPX.x * lowYBoundFar)) = RGB_MAGENTA;
+		*(fbPTR + screenX + (framebuffer.resolutionPX.x * lowYBoundNear)) = RGB_BLUE;
 	} else {
 		//Just fill Y fill data.
 		lowYMap[screenX] = lowYBoundNear;
-		*(fbPTR + screenX + (framebuffer.resolution.x * lowYBoundNear)) = RGB_MAGENTA;
-		*(fbPTR + screenX + (framebuffer.resolution.x * lowYBoundFar)) = RGB_BLUE;
+		*(fbPTR + screenX + (framebuffer.resolutionPX.x * lowYBoundNear)) = RGB_MAGENTA;
+		*(fbPTR + screenX + (framebuffer.resolutionPX.x * lowYBoundFar)) = RGB_BLUE;
 	}
 
 	//Draw upper border.
 	if (topYBoundNear > topYBoundFar) {
 		//Draw a connecting wall between them and fill Y fill data.
 		topYMap[screenX] = topYBoundFar;
-		*(fbPTR + screenX + (framebuffer.resolution.x * topYBoundFar)) = RGB_MAGENTA;
-		*(fbPTR + screenX + (framebuffer.resolution.x * topYBoundNear)) = RGB_BLUE;
+		*(fbPTR + screenX + (framebuffer.resolutionPX.x * topYBoundFar)) = RGB_MAGENTA;
+		*(fbPTR + screenX + (framebuffer.resolutionPX.x * topYBoundNear)) = RGB_BLUE;
 	} else {
 		//Just fill Y fill data.
 		topYMap[screenX] = topYBoundNear;
-		*(fbPTR + screenX + (framebuffer.resolution.x * topYBoundNear)) = RGB_MAGENTA;
-		*(fbPTR + screenX + (framebuffer.resolution.x * topYBoundFar)) = RGB_BLUE;
+		*(fbPTR + screenX + (framebuffer.resolutionPX.x * topYBoundNear)) = RGB_MAGENTA;
+		*(fbPTR + screenX + (framebuffer.resolutionPX.x * topYBoundFar)) = RGB_BLUE;
 	}
 
 
@@ -365,11 +365,11 @@ void r_drawPortalColumn(
 	if (lowYBoundNear <= lowYBoundFar) {
 		//Draw a connecting wall between them and fill Y fill data.
 		lowYMap[screenX] = lowYBoundFar;
-		ptr = fbPTR + screenX + (framebuffer.resolution.x * lowYBoundNear);
+		ptr = fbPTR + screenX + (framebuffer.resolutionPX.x * lowYBoundNear);
 		for (int y=lowYBoundNear; y<lowYBoundFar; y++) {
 			float t = (float)(y - lowYBoundNearUnclamp) / (float)(lowYBoundFarUnclamp - lowYBoundNearUnclamp);
 			*ptr = rgb_umul(*(texPTR + (int)(t * (float)TEXTURE_RESOLUTION.y)), nearSector->lightLevel);
-			ptr += framebuffer.resolution.x;
+			ptr += framebuffer.resolutionPX.x;
 		}
 		floorYMap[screenX] = yLow;
 
@@ -384,11 +384,11 @@ void r_drawPortalColumn(
 	if (topYBoundNear >= topYBoundFar) {
 		//Draw a connecting wall between them and fill Y fill data.
 		topYMap[screenX] = topYBoundFar;
-		ptr = fbPTR + screenX + (framebuffer.resolution.x * topYBoundFar);
+		ptr = fbPTR + screenX + (framebuffer.resolutionPX.x * topYBoundFar);
 		for (int y=topYBoundFar; y<topYBoundNear; y++) {
 			float t = (float)(y - topYBoundFarUnclamp) / (float)(topYBoundNearUnclamp - topYBoundFarUnclamp);
 			*ptr = rgb_fetch(*(texPTR + (int)(t * (float)TEXTURE_RESOLUTION.y)), nearSector->lightLevel);
-			ptr += framebuffer.resolution.x;
+			ptr += framebuffer.resolutionPX.x;
 		}
 		ceilYMap[screenX] = yTop;
 
@@ -497,9 +497,9 @@ void r_drawSpan(const PlaneSpan_t* thisSpan, RGB_t* fbPTR, const float aspectRat
 	//Draws horizontal span of floor/ceiling, textured.
 	if (!thisSpan->active) {return; /* Invalid! */}
 
-	unsigned int xStart = CLAMP(thisSpan->xStart, 0u, framebuffer.resolution.x-1u);
-	unsigned int xEnd = CLAMP(thisSpan->xEnd, 0u, framebuffer.resolution.x-1u);
-	if (thisSpan->row >= framebuffer.resolution.y) {return;}
+	unsigned int xStart = CLAMP(thisSpan->xStart, 0u, framebuffer.resolutionPX.x-1u);
+	unsigned int xEnd = CLAMP(thisSpan->xEnd, 0u, framebuffer.resolutionPX.x-1u);
+	if (thisSpan->row >= framebuffer.resolutionPX.y) {return;}
 
 
 	const Sector_t* thisSector = thisSpan->sector;
@@ -507,8 +507,8 @@ void r_drawSpan(const PlaneSpan_t* thisSpan, RGB_t* fbPTR, const float aspectRat
 		(thisSpan->isFloor && (thisSector->flags & 0x1)) || //If floor and floor textured
 		(!thisSpan->isFloor && (thisSector->flags & 0x2)) //If ceiling and ceiling textured
 	) {
-		float tStart = (float)(xStart) / (float)(framebuffer.resolution.x);
-		float tEnd = (float)(xEnd) / (float)(framebuffer.resolution.x);
+		float tStart = (float)(xStart) / (float)(framebuffer.resolutionPX.x);
+		float tEnd = (float)(xEnd) / (float)(framebuffer.resolutionPX.x);
 		float HALF_FOV = camera.FOV/2.0f;
 		float aStart = f_lerp(-HALF_FOV, HALF_FOV, tStart) + camera.yaw;
 		float aEnd = f_lerp(-HALF_FOV, HALF_FOV, tEnd) + camera.yaw;
@@ -549,7 +549,7 @@ void r_drawSpan(const PlaneSpan_t* thisSpan, RGB_t* fbPTR, const float aspectRat
 		Vec2f_t endUV = v2f_add(v2f_div(endPosition, PLANE_UV_SCALE), PLANE_UV_OFFSET);
 
 
-		RGB_t* rowStartPtr = fbPTR + (thisSpan->row * framebuffer.resolution.x);
+		RGB_t* rowStartPtr = fbPTR + (thisSpan->row * framebuffer.resolutionPX.x);
 		for (unsigned int screenX=xStart; screenX<=xEnd; screenX++) {
 			float t = (float)(screenX - xStart) / (float)(xEnd - xStart);
 			Vec2f_t interpUV = v2f_fract(v2f_lerp(startUV, endUV, t));
@@ -567,7 +567,7 @@ void r_drawSpan(const PlaneSpan_t* thisSpan, RGB_t* fbPTR, const float aspectRat
 			(thisSpan->isFloor) ? thisSector->floorColour : thisSector->ceilingColour,
 			thisSector->lightLevel
 		);
-		RGB_t* rowStartPtr = fbPTR + (thisSpan->row * framebuffer.resolution.x);
+		RGB_t* rowStartPtr = fbPTR + (thisSpan->row * framebuffer.resolutionPX.x);
 		for (unsigned int screenX=xStart; screenX<=xEnd; screenX++) {
 			*(rowStartPtr + screenX) = thisColour;
 		}
@@ -627,8 +627,8 @@ void r_drawLineDef(const LineDef_t* thisLineDef, RGB_t* fbPTR) {
 	int range = rightMost - leftMost;
 
 	int leftMostClamp = fmax(leftMost, 0);
-	int rightMostClamp = fmin(rightMost, framebuffer.resolution.x);
-	if ((rightMostClamp < 0) || (leftMostClamp >= framebuffer.resolution.x)) {return; /* Offscreen horizontally */}
+	int rightMostClamp = fmin(rightMost, framebuffer.resolutionPX.x);
+	if ((rightMostClamp < 0) || (leftMostClamp >= framebuffer.resolutionPX.x)) {return; /* Offscreen horizontally */}
 
 
 
@@ -654,10 +654,10 @@ void r_drawLineDef(const LineDef_t* thisLineDef, RGB_t* fbPTR) {
 
 
 	//Draw, interpolating.
-	float aspectRatio = (float)(framebuffer.resolution.x) / (float)(framebuffer.resolution.y);
+	float aspectRatio = (float)(framebuffer.resolutionPX.x) / (float)(framebuffer.resolutionPX.y);
 	float textureX = 0.0f;
 	unsigned int lowestPossibleSpan = 0u;
-	unsigned int highestPossibleSpan = framebuffer.resolution.y;
+	unsigned int highestPossibleSpan = framebuffer.resolutionPX.y;
 	for (int screenX=leftMostClamp; screenX<=rightMostClamp; screenX++) {
 		float interp = (float)(screenX - leftMost) / (float)(range);
 		float invDistance = MIN(f_lerp(lInvDepth, rInvDepth, interp), 1.0f / NEAR_PLANE);
