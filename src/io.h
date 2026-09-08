@@ -21,15 +21,8 @@ extern int keyMapPress[NUM_KEYS];
 //////// DATA ////////
 
 
-
-//////// INITIALISATION/EXIT ////////
-int io_init(void); //Returns success/failiure.
-void io_quit(void);
-//////// INITIALISATION/EXIT ////////
-
-
 //////// TICK ////////
-void io_pollEvents(void);
+void io_pollEvents(int* RUN);
 //////// TICK ////////
 
 

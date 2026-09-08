@@ -1,7 +1,4 @@
 /* physics.c */
-#include <stdio.h>
-
-
 #include "types.h"
 #include "maths.h"
 #include "io.h"
@@ -54,7 +51,7 @@ int p_getLDintersect(const LineDef_t* thisLineDef, const Movement_t* motion, flo
 	float dMsLDs = v2f_dist(motion->start, start);
 	float dMsLDe = v2f_dist(motion->start, end  );
 	float dMeLDe = v2f_dist(motion->end,   end  );
-	float minDist = MIN(MIN(dMsLDs, dMeLDs), MIN(dMeLDs, dMeLDe));
+	float minDist = MIN(MIN(dMsLDs, dMeLDs), MIN(dMsLDe, dMeLDe));
 	if (minDist <= CAMERA_HIT_RADIUS) {
 		//Intersects at one of the ends.
 		return TRUE;
@@ -62,7 +59,7 @@ int p_getLDintersect(const LineDef_t* thisLineDef, const Movement_t* motion, flo
 
 	
 	//Check the actual line at multiple points;
-	unsigned int steps = (int)(ceil(v2f_len(motion->delta) / CAMERA_HIT_RADIUS));
+	unsigned int steps = (int)(f_ceil(v2f_len(motion->delta) / CAMERA_HIT_RADIUS));
 	Vec2f_t step = v2f_mul(motion->delta, 1.0f / (float)(steps));
 	for (unsigned int i=0u; i<steps; i++) {
 		Vec2f_t delta = v2f_mul(step, (float)(i));
@@ -82,10 +79,13 @@ int p_getLDintersect(const LineDef_t* thisLineDef, const Movement_t* motion, flo
 
 int p_movementDidCrossLD(const LineDef_t* thisLineDef, const Movement_t* motion) {
 	//Check if actual motion vector crosses LD.
+	/*
 	Vec2f_t ldStart = g_vertices[thisLineDef->vStart];
 	Vec2f_t ldEnd = g_vertices[thisLineDef->vEnd];
 
 	Vec2f_t mStart = motion->start;
+	*/
+	return FALSE;
 }
 
 
@@ -149,7 +149,7 @@ int p_getSectorID(
 			//Can also happen from portals with too high step delta.
 
 			float dist = v2f_dot(v2f_sub(motion->end, start), normal);
-			float pen = CAMERA_HIT_RADIUS - fabs(intersectDistance);
+			float pen = CAMERA_HIT_RADIUS - f_abs(intersectDistance);
 			if (pen > EPSILON) {
 				float dir = (dist >= 0.0f) ? 1.0f : -1.0f;
 				motion->end = v2f_add(motion->end, v2f_mul(normal, dir * pen));
@@ -172,20 +172,20 @@ int p_getSectorID(
 
 
 int isOnFloor = FALSE;
-Vec2f_t p_handleInputs(Camera_t* camera, double dt) {
+Vec2f_t p_handleInputs(Camera_t* camera) {
 	//Camera Controls
-	if (keyMapHold[K_TURN_LEFT]) {camera->yaw -= TURNING_SPEED * dt;}
-	if (keyMapHold[K_TURN_RIGHT]) {camera->yaw += TURNING_SPEED * dt;}
-	camera->yaw = fmod(camera->yaw, 2.0f * M_PI);
+	if (keyMapHold[K_TURN_LEFT]) {camera->yaw -= TURNING_SPEED;}
+	if (keyMapHold[K_TURN_RIGHT]) {camera->yaw += TURNING_SPEED;}
+	camera->yaw = f_mod(camera->yaw, 2.0f * M_PI);
 	if (camera->yaw < 0.0f) {camera->yaw += 2.0f * M_PI;}
 
 	camera->forward = (Vec2f_t){
-		.x=sin(camera->yaw), .y=cos(camera->yaw)
+		.x=f_sin(camera->yaw), .y=f_cos(camera->yaw)
 	};
 
 
 	//Move camera based on inputs.
-	float movementSpeed = MOVEMENT_SPEED_BASE * dt;
+	float movementSpeed = MOVEMENT_SPEED_BASE;
 	if (keyMapHold[K_MOVE_FAST]) {movementSpeed *= 2.5f;}
 	Vec2f_t forward = v2f_mul(camera->forward, movementSpeed);
 	Vec2f_t right = (Vec2f_t){.x=forward.y, .y=-forward.x};
@@ -204,8 +204,8 @@ Vec2f_t p_handleInputs(Camera_t* camera, double dt) {
 
 
 
-void p_updateCamera(Camera_t* camera, double dt) {
-	Vec2f_t movementDelta = p_handleInputs(camera, dt);
+void p_updateCamera(Camera_t* camera) {
+	Vec2f_t movementDelta = p_handleInputs(camera);
 
 
 	Movement_t motion = (Movement_t){
@@ -215,16 +215,11 @@ void p_updateCamera(Camera_t* camera, double dt) {
 	motion.delta=v2f_sub(motion.end, motion.start);
 
 
-	LineDef_t* intersectedLinedef; //Only assigned if one was hit.
 	Sector_t* thisSector;
-	int hitLineDef = p_getSectorID(
+	p_getSectorID(
 		camera,	&thisSector, &motion
 	); //Get the sector that the camera is within.
 	camera->position = motion.end;
-
-#ifdef SUPPRESS_FRAMEBUFFER_OUTPUT
-	printf("Start: (%f, %f), End: (%f, %f)\n", motion.start.x, motion.start.y, motion.end.x, motion.end.y);
-#endif
 
 
 	//Check Z against ceiling/floor of the sector.
@@ -243,6 +238,6 @@ void p_updateCamera(Camera_t* camera, double dt) {
 		camera->Z = thisSector->ceilingHeight - CAMERA_HEAD_OFFSET * 1.01f; //Inverse offset to go head→camera, slightly further to prevent getting stuck.
 
 	}
-	camera->Zvelocity += (float)(GRAVITY) * (float)(dt);
+	camera->Zvelocity += (float)(GRAVITY);
 }
 

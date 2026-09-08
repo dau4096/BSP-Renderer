@@ -6,7 +6,7 @@
 #include "types.h"
 
 
-int l_loadGeo(const char* filePath);
+int l_loadGeo(void);
 
 
 #endif

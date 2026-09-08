@@ -1,33 +1,29 @@
-CC = gcc
-INCLUDE = -I/usr/include -I/usr/local/include
-LIBS = -lm -ldl -ludev -pthread -lxml2
+CC = /usr/local/cross/bin/sh3eb-elf-gcc
+CFLAGS = -I$(HOME)/libfxcg/include -I./ -I./src -O2 -Wall -Wno-unused-function -fno-lto -m4-nofpu -std=c99
+LIBS = -L$(HOME)/libfxcg/lib -lfxcg -lc -lgcc -nostdlib -nostartfiles
+LKR = $(HOME)/libfxcg/toolchain/prizm.x
 
-SHARED_FLAGS = -DCOLOUR_QUANTISATION -DLIMITED_FREQ -DPLANE_SPAN_TEXTURING
-DEBUG_FLAGS = -g -DDEBUG -DDEBUG_VALUES -DDEBUG_DRAW_ORDER #-DDEBUG_BORDERS #-DSUPPRESS_FRAMEBUFFER_OUTPUT
-RELEASE_FLAGS =  -O3 -ffast-math -march=native
 
 SOURCES = main.c src/graphics.c src/terminal.c src/physics.c src/io.c src/ui.c src/loader.c
 OBJECTS = $(SOURCES:.c=.o)
-BINFILE = prgm.x86_64
+BINFILE = prgm.bin
 
 
 
-.PHONY: all release debug clean
+.PHONY: all bin g3a clean
 
-all: release
+all: g3a
 
-release: CFLAGS = $(SHARED_FLAGS) $(RELEASE_FLAGS)
-release: $(OBJECTS)
-	$(CC) $(OBJECTS) $(LIBS) -o $(BINFILE)
+bin: $(OBJECTS)
+	$(CC) $(OBJECTS) $(LIBS) -T $(LKR) -o $(BINFILE)
 
-debug: CFLAGS = $(SHARED_FLAGS) $(DEBUG_FLAGS)
-debug: $(OBJECTS)
-	$(CC) $(OBJECTS) $(LIBS) -o $(BINFILE)
+g3a: bin
+	mkg3a $(BINFILE)
 
 %.o: %.c %.h
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(OBJECTS) $(BINFILE)
+	rm -f $(OBJECTS) $(BINFILE) *.g3a
 
 
