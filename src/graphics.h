@@ -6,11 +6,6 @@
 
 
 //////// DATA ////////
-#define MAX_TEXTURES 64u
-#define FALLBACK_TEXTURE_PATH "textures/fallback.png"
-extern unsigned int fallbackTextureIndex;
-
-
 extern Camera_t* r_camera;
 
 
@@ -22,17 +17,7 @@ extern unsigned int g_numSectors;
 extern Vec2f_t* g_vertices;
 extern LineDef_t* g_lineDefs;
 extern Sector_t* g_sectors;
-
-
-#ifdef DEBUG_DRAW_ORDER
-extern int currentDrawNumber;
-#endif
 //////// DATA ////////
-
-
-//////// DEPTH MAPPING ////////
-void r_reallocColumnBuffers(void);
-//////// DEPTH MAPPING ////////
 
 
 //////// DRAWING ////////
@@ -44,7 +29,6 @@ void r_drawFrame(void);
 
 //////// INITIALISATION ////////
 void r_initCamera(void);
-int r_loadTextures(const char** textureNames, const unsigned int numTexturePaths);
 //////// INITIALISATION ////////
 
 

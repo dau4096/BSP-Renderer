@@ -1,20 +1,14 @@
 /* graphics.c */
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
-
-#include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
-
+#include <fxcg/display.h>
+#include <fxcg/heap.h>
 
 #include "graphics.h"
 
-#ifdef DEBUG_DRAW_ORDER
-	#include "io.h"
-#endif
 
 #include "types.h"
 #include "maths.h"
+#include "sort.h"
 #include "terminal.h"
 
 
@@ -38,6 +32,7 @@ Sector_t* g_sectors; //Sectors made of LineDefs.
 //////// CONSTANTS ////////
 #define EPSILON 1.0e-3f
 #define NEAR_PLANE 1.0e-3f
+#define DEPTH_SCALE_K 0.04f
 
 
 #define PLANE_UV_SCALE 2.0f
@@ -48,51 +43,31 @@ Sector_t* g_sectors; //Sectors made of LineDefs.
 
 //////// COLUMN DATA ////////
 typedef uint8_t Depth_t;
-Depth_t* depthMap; //1D depthmap.
-unsigned int* lowYMap; //Lowest pixel of each column allowed to be drawn to
-unsigned int* topYMap; //Highest pixel of each column allowed to be drawn to
+Depth_t depthMap[LCD_WIDTH_PX]; //1D depthmap.
+unsigned int lowYMap[LCD_WIDTH_PX]; //Lowest pixel of each column allowed to be drawn to
+unsigned int topYMap[LCD_WIDTH_PX]; //Highest pixel of each column allowed to be drawn to
 
-unsigned int* lowYMapOld; //Same as above, old.
-unsigned int* topYMapOld; //Same as above, old.
-unsigned int* floorYMap; //Contains floor extent data
-unsigned int* ceilYMap; //Contains ceiling extent data
-
-
-void r_reallocColumnBuffers(void) {
-	//If they exist, remove then remake.
-	if (lowYMap) {free(lowYMap);}
-	lowYMap = calloc(framebuffer.resolution.x, sizeof(unsigned int));
-	if (lowYMapOld) {free(lowYMapOld);}
-	lowYMapOld = calloc(framebuffer.resolution.x, sizeof(unsigned int));
-	if (floorYMap) {free(floorYMap);}
-	floorYMap = calloc(framebuffer.resolution.x, sizeof(unsigned int));
-
-	if (depthMap) {free(depthMap);}
-	depthMap = calloc(framebuffer.resolution.x, sizeof(Depth_t));
-
-	if (topYMap) {free(topYMap);}
-	topYMap = calloc(framebuffer.resolution.x, sizeof(unsigned int));
-	if (topYMapOld) {free(topYMapOld);}
-	topYMapOld = calloc(framebuffer.resolution.x, sizeof(unsigned int));
-	if (ceilYMap) {free(ceilYMap);}
-	ceilYMap = calloc(framebuffer.resolution.x, sizeof(unsigned int));
-}
+unsigned int lowYMapOld[LCD_WIDTH_PX]; //Same as above, old.
+unsigned int topYMapOld[LCD_WIDTH_PX]; //Same as above, old.
+unsigned int floorYMap[LCD_WIDTH_PX]; //Contains floor extent data
+unsigned int ceilYMap[LCD_WIDTH_PX]; //Contains ceiling extent data
 
 
 void r_clearColumnBuffers() {
-	memset(lowYMap, (unsigned int)(0x00u), framebuffer.resolution.x * sizeof(unsigned int)); //Reset to all 0x00 (0px, bottom of the screen) values.
-	memset(lowYMapOld, (unsigned int)(0x00u), framebuffer.resolution.x * sizeof(unsigned int)); //Reset to all 0x00 (0px, bottom of the screen) values.
-	memset(depthMap, (Depth_t)(0xFFu), framebuffer.resolution.x * sizeof(Depth_t)); //Reset to all 0xFF (255, max depth) values.
-	for (unsigned int index=0u; index<framebuffer.resolution.x; index++) {
+	memset(lowYMap, (unsigned int)(0x00u), LCD_WIDTH_PX * sizeof(unsigned int)); //Reset to all 0x00 (0px, bottom of the screen) values.
+	memset(lowYMapOld, (unsigned int)(0x00u), LCD_WIDTH_PX * sizeof(unsigned int)); //Reset to all 0x00 (0px, bottom of the screen) values.
+	memset(depthMap, (Depth_t)(0xFFu), LCD_WIDTH_PX * sizeof(Depth_t)); //Reset to all 0xFF (255, max depth) values.
+	for (unsigned int index=0u; index<LCD_WIDTH_PX; index++) {
 		//Set to all [resY] values.
-		topYMap[index] = framebuffer.resolution.y;
-		topYMapOld[index] = framebuffer.resolution.y;
+		topYMap[index] = LCD_HEIGHT_PX;
+		topYMapOld[index] = LCD_HEIGHT_PX;
 	}
 }
 
 
 Depth_t r_mapDepth(float depthF) {
-	float t = log(depthF / camera.near) / log(camera.far / camera.near);
+	float x = (depthF - camera.near) / (camera.far - camera.near);
+	float t = x / (x + DEPTH_SCALE_K*(1.0f - x));
 	return (Depth_t)(
 		CLAMP(t * 255.0f, 0.0f, 255.0f) //Remap to 0-255.
 	);
@@ -114,75 +89,18 @@ int r_manageColumnValues(unsigned int x, unsigned int* lowYBound, unsigned int* 
 
 
 
-//////// TEXTURES ////////
-#define TEXTURE_RESOLUTION ((Vec2i_t){.x=32, .y=32})
-RGB_t* textures[MAX_TEXTURES]; //Stores texture data. Each entry is a 32×32 grid of pixel data (1D) organised by columns ([(x * 32) + y])
-uint8_t colourMap[256][256];
-unsigned int fallbackTextureIndex;
-
-
-int r_loadTexture(const char* path, RGB_t** pixels) { //Returns success
-	stbi_set_flip_vertically_on_load(TRUE);
-	int width, height, channels;
-	unsigned char* textureDataSTBI = stbi_load(
-		path,
-		&width, &height,
-		&channels, 3 //Only take RGB back, not A.
-	);
-
-	if (
-		(!textureDataSTBI) || //Failed to load
-		(width != TEXTURE_RESOLUTION.x) || (height != TEXTURE_RESOLUTION.y) //Wrong resolution
-	) {return FALSE; /* Invalid */}
-
-	//Transpose, and convert from [unsigned char] data to (RGB_t)[R, G, B] data.
-	//Pixel data is used in columns so swapping from [y][x] order to [x][y] order is worthwhile.
-	*pixels = malloc(sizeof(RGB_t) * width * height);
-	for (unsigned int i=0u; i<TEXTURE_RESOLUTION.x; i++) {
-		for (unsigned int j=0u; j<TEXTURE_RESOLUTION.y; j++) {
-			unsigned char* pxStart = textureDataSTBI + ((j * TEXTURE_RESOLUTION.x) + i) * 3u;
-			RGB_t* ptr = (*pixels) + (i * TEXTURE_RESOLUTION.y) + j;
-			*ptr = (RGB_t){
-				.r=(uint8_t)(*(pxStart+0)),
-				.g=(uint8_t)(*(pxStart+1)),
-				.b=(uint8_t)(*(pxStart+2))
-			};
-			rgb_quantise(ptr);
-		}
-	}
-
-	//Cleanup
-	stbi_image_free(textureDataSTBI);
-
-	return TRUE;
-}
-
-
-int r_getColumn(const unsigned int ID, int x, RGB_t** ptr) { //Returns success
-	if (ID >= MAX_TEXTURES) {return FALSE; /* Invalid */}
-	if (x < 0) {x = 0;}
-	else if (x >= TEXTURE_RESOLUTION.y) {x = TEXTURE_RESOLUTION.x-1;}
-	*ptr = textures[ID] + (x * TEXTURE_RESOLUTION.y); //Organised in columns, so iterate over this [TEXTURE_RESOLUTION.y] times for a full column.
-	return TRUE;
-}
-
-//////// TEXTURES ////////
-
-
-
-
 
 //////// DRAWING ////////
 int r_getCentreX(const Vec2f_t position) {
 	Vec2f_t direction = v2f_sub(position, camera.position);
 
-	float theta = atan2(direction.x, direction.y);
+	float theta = f_atan2(direction.x, direction.y);
 	float angleDelta = theta - camera.yaw;
 
 	while (angleDelta >  M_PI) {angleDelta -= 2.0f * M_PI;}
 	while (angleDelta < -M_PI) {angleDelta += 2.0f * M_PI;}
 
-	float centreX = ((float)(framebuffer.resolution.x) / 2.0f) * ((angleDelta * 2.0f / camera.FOV) + 1.0f);
+	float centreX = ((float)(LCD_WIDTH_PX) / 2.0f) * ((angleDelta * 2.0f / camera.FOV) + 1.0f);
 	return (int)(centreX);
 }
 
@@ -193,20 +111,20 @@ void r_getLineDefSectorProjections(
 	float projectedYFloor = (camera.Z - thisSector->floorHeight) * invDistance;
 	float projectedYCeiling = (camera.Z - thisSector->ceilingHeight) * invDistance;
 
-	*lowY = (int)((float)(framebuffer.resolution.y) * (0.5f - projectedYFloor));
-	*topY = (int)((float)(framebuffer.resolution.y) * (0.5f - projectedYCeiling));
+	*lowY = (int)((float)(LCD_HEIGHT_PX) * (0.5f - projectedYFloor));
+	*topY = (int)((float)(LCD_HEIGHT_PX) * (0.5f - projectedYCeiling));
 }
 
 
 
-float r_inverseDistanceProjections(
+void r_inverseDistanceProjections(
 	const Sector_t* thisSector, float aspectRatio,
 	int yLow, int yTop,
 	float* ceilDistance, float* floorDistance
 ) {
 	//Inverses r_getLineDefSectorProjections for top/bottom of screen.
-	float projectedYCeiling = 0.5f - (float)yTop / framebuffer.resolution.y;
-	float projectedYFloor = 0.5f - (float)yLow / framebuffer.resolution.y;
+	float projectedYCeiling = 0.5f - (float)yTop / LCD_HEIGHT_PX;
+	float projectedYFloor = 0.5f - (float)yLow / LCD_HEIGHT_PX;
 
 	//proj = (deltaZ * aspectRatio) / distance
 	//:. distance = (deltaZ * aspectRatio) / proj
@@ -219,12 +137,7 @@ float r_inverseDistanceProjections(
 
 
 RGB_t rgb_fetch(const RGB_t textureValue, const uint8_t lightLevel) {
-	//Fetches pre-lit 8b values for each channel.
-	return (RGB_t){
-		.r=colourMap[lightLevel][textureValue.r],
-		.g=colourMap[lightLevel][textureValue.g],
-		.b=colourMap[lightLevel][textureValue.b]
-	};
+	return rgb_umul(textureValue, lightLevel);
 }
 
 
@@ -250,8 +163,8 @@ void r_drawSolidColumn(
 	);
 	if ((topYBound<=minYBound) || (lowYBound>=maxYBound)) {return; /* Completely offscreen vertically. */}
 
-	int yLow = fmax(lowYBound, minYBound);
-	int yTop = fmin(topYBound, maxYBound);
+	int yLow = MAX(lowYBound, minYBound);
+	int yTop = MIN(topYBound, maxYBound);
 
 	//Column is taken, column was solid.
 	lowYMap[screenX] = 0;
@@ -264,22 +177,21 @@ void r_drawSolidColumn(
 
 #ifdef DEBUG_BORDERS
 	//Draw floor border.
-	*(fbPTR + screenX + (framebuffer.resolution.x * yLow)) = RGB_RED;
+	*(fbPTR + screenX + (LCD_WIDTH_PX * yLow)) = RGB_RED;
 
 	//Draw floor border.
-	*(fbPTR + screenX + (framebuffer.resolution.x * yTop)) = RGB_RED;
+	*(fbPTR + screenX + (LCD_WIDTH_PX * yTop)) = RGB_RED;
 
 #else
 
 	//Draws top-to-bottom vertically. (Image is flipped when drawing to console)
 	//Draw wall.
-	RGB_t* ptr = fbPTR + screenX + (framebuffer.resolution.x * yLow);
-	RGB_t* texPTR;
-	if (!r_getColumn(textureID, textureX, &texPTR)) {return;}
+	RGB_t* ptr = fbPTR + screenX + (LCD_WIDTH_PX * yLow);
+	RGB_t colour = rgb_fetch(RGB_RED, thisSector->lightLevel);
 	for (int y=yLow; y<yTop; y++) {
-		float t = (float)(y - lowYBound) / (float)(topYBound - lowYBound);
-		*ptr = rgb_fetch(*(texPTR + (int)(t * (float)(TEXTURE_RESOLUTION.y))), thisSector->lightLevel);
-		ptr += framebuffer.resolution.x;
+		//float t = (float)(y - lowYBound) / (float)(topYBound - lowYBound);
+		*ptr = colour;//rgb_fetch(colour, thisSector->lightLevel);
+		ptr += LCD_WIDTH_PX;
 	}
 	depthMap[screenX] = mappedDepth;
 #endif
@@ -322,8 +234,8 @@ void r_drawPortalColumn(
 	int topYBoundFar = CLAMP(topYBoundFarUnclamp, minYBound, maxYBound);
 
 
-	int yLow = fmin(lowYBoundNear, lowYBoundFar);
-	int yTop = fmax(topYBoundNear, topYBoundFar);
+	int yLow = MIN(lowYBoundNear, lowYBoundFar);
+	int yTop = MAX(topYBoundNear, topYBoundFar);
 
 
 
@@ -332,26 +244,26 @@ void r_drawPortalColumn(
 	if (lowYBoundNear < lowYBoundFar) {
 		//Draw a connecting wall between them and fill Y fill data.
 		lowYMap[screenX] = lowYBoundFar;
-		*(fbPTR + screenX + (framebuffer.resolution.x * lowYBoundFar)) = RGB_MAGENTA;
-		*(fbPTR + screenX + (framebuffer.resolution.x * lowYBoundNear)) = RGB_BLUE;
+		*(fbPTR + screenX + (LCD_WIDTH_PX * lowYBoundFar)) = RGB_MAGENTA;
+		*(fbPTR + screenX + (LCD_WIDTH_PX * lowYBoundNear)) = RGB_BLUE;
 	} else {
 		//Just fill Y fill data.
 		lowYMap[screenX] = lowYBoundNear;
-		*(fbPTR + screenX + (framebuffer.resolution.x * lowYBoundNear)) = RGB_MAGENTA;
-		*(fbPTR + screenX + (framebuffer.resolution.x * lowYBoundFar)) = RGB_BLUE;
+		*(fbPTR + screenX + (LCD_WIDTH_PX * lowYBoundNear)) = RGB_MAGENTA;
+		*(fbPTR + screenX + (LCD_WIDTH_PX * lowYBoundFar)) = RGB_BLUE;
 	}
 
 	//Draw upper border.
 	if (topYBoundNear > topYBoundFar) {
 		//Draw a connecting wall between them and fill Y fill data.
 		topYMap[screenX] = topYBoundFar;
-		*(fbPTR + screenX + (framebuffer.resolution.x * topYBoundFar)) = RGB_MAGENTA;
-		*(fbPTR + screenX + (framebuffer.resolution.x * topYBoundNear)) = RGB_BLUE;
+		*(fbPTR + screenX + (LCD_WIDTH_PX * topYBoundFar)) = RGB_MAGENTA;
+		*(fbPTR + screenX + (LCD_WIDTH_PX * topYBoundNear)) = RGB_BLUE;
 	} else {
 		//Just fill Y fill data.
 		topYMap[screenX] = topYBoundNear;
-		*(fbPTR + screenX + (framebuffer.resolution.x * topYBoundNear)) = RGB_MAGENTA;
-		*(fbPTR + screenX + (framebuffer.resolution.x * topYBoundFar)) = RGB_BLUE;
+		*(fbPTR + screenX + (LCD_WIDTH_PX * topYBoundNear)) = RGB_MAGENTA;
+		*(fbPTR + screenX + (LCD_WIDTH_PX * topYBoundFar)) = RGB_BLUE;
 	}
 
 
@@ -359,17 +271,16 @@ void r_drawPortalColumn(
 
 	//Draws top-to-bottom vertically.
 	RGB_t* ptr;
-	RGB_t* texPTR;
+	RGB_t colour = rgb_fetch(RGB_BLUE, nearSector->lightLevel);
 
-	if (!r_getColumn(textureID, textureX, &texPTR)) {return;}
 	if (lowYBoundNear <= lowYBoundFar) {
 		//Draw a connecting wall between them and fill Y fill data.
 		lowYMap[screenX] = lowYBoundFar;
-		ptr = fbPTR + screenX + (framebuffer.resolution.x * lowYBoundNear);
+		ptr = fbPTR + screenX + (LCD_WIDTH_PX * lowYBoundNear);
 		for (int y=lowYBoundNear; y<lowYBoundFar; y++) {
-			float t = (float)(y - lowYBoundNearUnclamp) / (float)(lowYBoundFarUnclamp - lowYBoundNearUnclamp);
-			*ptr = rgb_umul(*(texPTR + (int)(t * (float)TEXTURE_RESOLUTION.y)), nearSector->lightLevel);
-			ptr += framebuffer.resolution.x;
+			//float t = (float)(y - lowYBoundNearUnclamp) / (float)(lowYBoundFarUnclamp - lowYBoundNearUnclamp);
+			*ptr = colour;//rgb_umul(colour, nearSector->lightLevel);
+			ptr += LCD_WIDTH_PX;
 		}
 		floorYMap[screenX] = yLow;
 
@@ -381,14 +292,15 @@ void r_drawPortalColumn(
 
 
 	//Draw the upper (Y value, lower onscreen) section of the portal
+	colour = rgb_fetch(RGB_GREEN, nearSector->lightLevel);
 	if (topYBoundNear >= topYBoundFar) {
 		//Draw a connecting wall between them and fill Y fill data.
 		topYMap[screenX] = topYBoundFar;
-		ptr = fbPTR + screenX + (framebuffer.resolution.x * topYBoundFar);
+		ptr = fbPTR + screenX + (LCD_WIDTH_PX * topYBoundFar);
 		for (int y=topYBoundFar; y<topYBoundNear; y++) {
-			float t = (float)(y - topYBoundFarUnclamp) / (float)(topYBoundNearUnclamp - topYBoundFarUnclamp);
-			*ptr = rgb_fetch(*(texPTR + (int)(t * (float)TEXTURE_RESOLUTION.y)), nearSector->lightLevel);
-			ptr += framebuffer.resolution.x;
+			//float t = (float)(y - topYBoundFarUnclamp) / (float)(topYBoundNearUnclamp - topYBoundFarUnclamp);
+			*ptr = colour;//rgb_fetch(colour, nearSector->lightLevel);
+			ptr += LCD_WIDTH_PX;
 		}
 		ceilYMap[screenX] = yTop;
 
@@ -409,11 +321,11 @@ int r_clipLDVertices(Vec2f_t* start, Vec2f_t* end, float* startT, float* endT) {
 	//If it's out of the view entirely, return FALSE.
 	
 	float leftAngle = camera.yaw - (camera.FOV * 0.5f);
-	Vec2f_t leftDirection = (Vec2f_t){.x=sin(leftAngle), .y=cos(leftAngle)}; //Points direction of leftside of screen.
+	Vec2f_t leftDirection = (Vec2f_t){.x=f_sin(leftAngle), .y=f_cos(leftAngle)}; //Points direction of leftside of screen.
 	Vec2f_t leftNormal = (Vec2f_t){.x=leftDirection.y, .y=-leftDirection.x}; //Rotate CW to face into view. Positive values means RIGHT of leftmost edge.
 
 	float rightAngle = camera.yaw + (camera.FOV * 0.5f);
-	Vec2f_t rightDirection = (Vec2f_t){.x=sin(rightAngle), .y=cos(rightAngle)}; //Points direction of rightside of screen.
+	Vec2f_t rightDirection = (Vec2f_t){.x=f_sin(rightAngle), .y=f_cos(rightAngle)}; //Points direction of rightside of screen.
 	Vec2f_t rightNormal = (Vec2f_t){.x=-rightDirection.y, .y=rightDirection.x}; //Rotate ACW to face into view. Positive values means LEFT of rightmost edge.
 
 
@@ -458,13 +370,13 @@ int r_clipLDVertices(Vec2f_t* start, Vec2f_t* end, float* startT, float* endT) {
 	//Handle start clipping.
 	if (leftDotStart < 0.0f) {
 		//Start is offscreen to the left
-		float t = (-leftDotStart) / (fabsf(leftDotEnd) + fabsf(leftDotStart));
+		float t = (-leftDotStart) / (f_abs(leftDotEnd) + f_abs(leftDotStart));
 		*start = v2f_add(originalStart, v2f_mul(originalDelta, t));
 		*startT = t;
 
 	} else if (rightDotStart < 0.0f) {
 		//Start is offscreen to the right (Cannot be both - Would be behind camera and so have exited by this point.)
-		float t = (-rightDotStart) / (fabsf(rightDotEnd) + fabsf(rightDotStart));
+		float t = (-rightDotStart) / (f_abs(rightDotEnd) + f_abs(rightDotStart));
 		*start = v2f_add(originalStart, v2f_mul(originalDelta, t));
 		*startT = t;
 
@@ -473,14 +385,14 @@ int r_clipLDVertices(Vec2f_t* start, Vec2f_t* end, float* startT, float* endT) {
 	//Handle end clipping.
 	if (leftDotEnd < 0.0f) {
 		//End is offscreen to the left
-		float t = (-leftDotEnd) / (fabsf(leftDotStart) + fabsf(leftDotEnd));
+		float t = (-leftDotEnd) / (f_abs(leftDotStart) + f_abs(leftDotEnd));
 		*end = v2f_sub(originalEnd, v2f_mul(originalDelta, t));
 		*endT = 1.0f - t;
 
 	}
 	if (rightDotEnd < 0.0f) {
 		//End is offscreen to the right
-		float t = (-rightDotEnd) / (fabsf(rightDotStart) + fabsf(rightDotEnd));
+		float t = (-rightDotEnd) / (f_abs(rightDotStart) + f_abs(rightDotEnd));
 		*end = v2f_sub(originalEnd, v2f_mul(originalDelta, t));
 		*endT = 1.0f - t;
 
@@ -497,18 +409,19 @@ void r_drawSpan(const PlaneSpan_t* thisSpan, RGB_t* fbPTR, const float aspectRat
 	//Draws horizontal span of floor/ceiling, textured.
 	if (!thisSpan->active) {return; /* Invalid! */}
 
-	unsigned int xStart = CLAMP(thisSpan->xStart, 0u, framebuffer.resolution.x-1u);
-	unsigned int xEnd = CLAMP(thisSpan->xEnd, 0u, framebuffer.resolution.x-1u);
-	if (thisSpan->row >= framebuffer.resolution.y) {return;}
+	unsigned int xStart = CLAMP(thisSpan->xStart, 0u, LCD_WIDTH_PX-1u);
+	unsigned int xEnd = CLAMP(thisSpan->xEnd, 0u, LCD_WIDTH_PX-1u);
+	if (thisSpan->row >= LCD_HEIGHT_PX) {return;}
 
 
 	const Sector_t* thisSector = thisSpan->sector;
 	if (
+		FALSE && (
 		(thisSpan->isFloor && (thisSector->flags & 0x1)) || //If floor and floor textured
-		(!thisSpan->isFloor && (thisSector->flags & 0x2)) //If ceiling and ceiling textured
-	) {
-		float tStart = (float)(xStart) / (float)(framebuffer.resolution.x);
-		float tEnd = (float)(xEnd) / (float)(framebuffer.resolution.x);
+		(!thisSpan->isFloor && (thisSector->flags & 0x2))) //If ceiling and ceiling textured
+	) { /* //Temporarily removed.
+		float tStart = (float)(xStart) / (float)(LCD_WIDTH_PX);
+		float tEnd = (float)(xEnd) / (float)(LCD_WIDTH_PX);
 		float HALF_FOV = camera.FOV/2.0f;
 		float aStart = f_lerp(-HALF_FOV, HALF_FOV, tStart) + camera.yaw;
 		float aEnd = f_lerp(-HALF_FOV, HALF_FOV, tEnd) + camera.yaw;
@@ -522,10 +435,10 @@ void r_drawSpan(const PlaneSpan_t* thisSpan, RGB_t* fbPTR, const float aspectRat
 		);
 
 		Vec2f_t startDelta = (Vec2f_t) {
-			.x=sin(aStart), .y=cos(aStart)
+			.x=f_sin(aStart), .y=f_cos(aStart)
 		};
 		Vec2f_t endDelta = (Vec2f_t) {
-			.x=sin(aEnd), .y=cos(aEnd)
+			.x=f_sin(aEnd), .y=f_cos(aEnd)
 		};
 
 		unsigned int spanTexture;
@@ -549,17 +462,17 @@ void r_drawSpan(const PlaneSpan_t* thisSpan, RGB_t* fbPTR, const float aspectRat
 		Vec2f_t endUV = v2f_add(v2f_div(endPosition, PLANE_UV_SCALE), PLANE_UV_OFFSET);
 
 
-		RGB_t* rowStartPtr = fbPTR + (thisSpan->row * framebuffer.resolution.x);
+		RGB_t* rowStartPtr = fbPTR + (thisSpan->row * LCD_WIDTH_PX);
 		for (unsigned int screenX=xStart; screenX<=xEnd; screenX++) {
 			float t = (float)(screenX - xStart) / (float)(xEnd - xStart);
 			Vec2f_t interpUV = v2f_fract(v2f_lerp(startUV, endUV, t));
 			Vec2i_t uvInt = (Vec2i_t){
-				.x=(int)(fabsf(interpUV.x * TEXTURE_RESOLUTION.x)) % TEXTURE_RESOLUTION.x,
-				.y=(int)(fabsf(interpUV.y * TEXTURE_RESOLUTION.y)) % TEXTURE_RESOLUTION.y
+				.x=(int)(f_abs(interpUV.x * TEXTURE_RESOLUTION.x)) % TEXTURE_RESOLUTION.x,
+				.y=(int)(f_abs(interpUV.y * TEXTURE_RESOLUTION.y)) % TEXTURE_RESOLUTION.y
 			};
 			RGB_t* texColour = (textures[spanTexture] + (uvInt.x * TEXTURE_RESOLUTION.y)) + uvInt.y;
 			*(rowStartPtr + screenX) = rgb_fetch(*texColour, thisSector->lightLevel);
-		}
+		} */
 
 	} else {
 
@@ -567,7 +480,7 @@ void r_drawSpan(const PlaneSpan_t* thisSpan, RGB_t* fbPTR, const float aspectRat
 			(thisSpan->isFloor) ? thisSector->floorColour : thisSector->ceilingColour,
 			thisSector->lightLevel
 		);
-		RGB_t* rowStartPtr = fbPTR + (thisSpan->row * framebuffer.resolution.x);
+		RGB_t* rowStartPtr = fbPTR + (thisSpan->row * LCD_WIDTH_PX);
 		for (unsigned int screenX=xStart; screenX<=xEnd; screenX++) {
 			*(rowStartPtr + screenX) = thisColour;
 		}
@@ -626,9 +539,9 @@ void r_drawLineDef(const LineDef_t* thisLineDef, RGB_t* fbPTR) {
 	}
 	int range = rightMost - leftMost;
 
-	int leftMostClamp = fmax(leftMost, 0);
-	int rightMostClamp = fmin(rightMost, framebuffer.resolution.x);
-	if ((rightMostClamp < 0) || (leftMostClamp >= framebuffer.resolution.x)) {return; /* Offscreen horizontally */}
+	int leftMostClamp = MAX(leftMost, 0);
+	int rightMostClamp = MIN(rightMost, LCD_WIDTH_PX);
+	if ((rightMostClamp < 0) || (leftMostClamp >= LCD_WIDTH_PX)) {return; /* Offscreen horizontally */}
 
 
 
@@ -654,14 +567,14 @@ void r_drawLineDef(const LineDef_t* thisLineDef, RGB_t* fbPTR) {
 
 
 	//Draw, interpolating.
-	float aspectRatio = (float)(framebuffer.resolution.x) / (float)(framebuffer.resolution.y);
+	float aspectRatio = (float)(LCD_WIDTH_PX) / (float)(LCD_HEIGHT_PX);
 	float textureX = 0.0f;
 	unsigned int lowestPossibleSpan = 0u;
-	unsigned int highestPossibleSpan = framebuffer.resolution.y;
+	unsigned int highestPossibleSpan = LCD_HEIGHT_PX;
 	for (int screenX=leftMostClamp; screenX<=rightMostClamp; screenX++) {
 		float interp = (float)(screenX - leftMost) / (float)(range);
 		float invDistance = MIN(f_lerp(lInvDepth, rInvDepth, interp), 1.0f / NEAR_PLANE);
-		float depthF = 1.0f / invDistance;
+		//float depthF = 1.0f / invDistance;
 		Vec2f_t interpPosition = v2f_lerp(leftMostPosiiton, rightMostPosition, interp);
 
 
@@ -679,7 +592,7 @@ void r_drawLineDef(const LineDef_t* thisLineDef, RGB_t* fbPTR) {
 
 
 		float t = f_lerp(leftT, rightT, interp);
-		textureX = (int)(t * (float)(TEXTURE_RESOLUTION.x));
+		textureX = (int)(t);//(int)(t * (float)(TEXTURE_RESOLUTION.x));
 
 		if (isSolid) {
 			r_drawSolidColumn(
@@ -718,7 +631,7 @@ void r_drawLineDef(const LineDef_t* thisLineDef, RGB_t* fbPTR) {
 					currentSpan.xEnd = column;
 
 				} else {
-					//If no such span exists, create new one using sector floor's texture ID.
+					//If no such span exists, create new one uf_sing sector floor's texture ID.
 					currentSpan = (PlaneSpan_t){
 						.row=row, .xStart=column, .xEnd=column,
 						.sector=thisSector, .isFloor=TRUE,
@@ -733,7 +646,7 @@ void r_drawLineDef(const LineDef_t* thisLineDef, RGB_t* fbPTR) {
 					currentSpan.xEnd = column;
 
 				} else {
-					//If no such span exists, create new one using sector ceiling's texture ID.
+					//If no such span exists, create new one uf_sing sector ceiling's texture ID.
 					currentSpan = (PlaneSpan_t){
 						.row=row, .xStart=column, .xEnd=column,
 						.sector=thisSector, .isFloor=FALSE,
@@ -743,14 +656,14 @@ void r_drawLineDef(const LineDef_t* thisLineDef, RGB_t* fbPTR) {
 
 			} else {
 				//Current span must have ended.
-				r_drawSpan(&currentSpan, fbPTR, aspectRatio); //Draw using it's extents and texture information.
+				r_drawSpan(&currentSpan, fbPTR, aspectRatio); //Draw uf_sing it's extents and texture information.
 				currentSpan.active = FALSE; //Invalidate span.
 			}
 		}
 
 		if (currentSpan.active) {
 			//Finish row by drawing current span.
-			r_drawSpan(&currentSpan, fbPTR, aspectRatio); //Draw using it's extents and texture information.
+			r_drawSpan(&currentSpan, fbPTR, aspectRatio); //Draw uf_sing it's extents and texture information.
 			currentSpan.active = FALSE; //Invalidate span.
 		}
 	}
@@ -774,7 +687,7 @@ float r_getLineDefDistance(const LineDef_t* thisLineDef, const Vec2f_t position)
 
 	if (projD < 0.0f) {return v2f_len(delta); /* Distance to [start] */}
 	else if (projD > dirLen) {return v2f_dist(position, end); /* Distance to [end] */}
-	else {return fabsf(projN); /* Distance of [projection] (Perpendicular to lineDefinition) */}
+	else {return f_abs(projN); /* Distance of [projection] (Perpendicular to lineDefinition) */}
 }
 
 
@@ -792,7 +705,7 @@ void r_sortLineDefs(
 	LineDef_t** result, unsigned int* numValidLineDefs
 ) {
 	//Find LDs nearest to furthest.
-	LineDefSort_t* sorts = calloc(g_numLineDefs, sizeof(LineDefSort_t));
+	LineDefSort_t* sorts = sys_calloc(g_numLineDefs, sizeof(LineDefSort_t));
 	unsigned int numSorts = 0u;
 
 	for (unsigned int ldIndex=0u; ldIndex<g_numLineDefs; ldIndex++) {
@@ -800,16 +713,16 @@ void r_sortLineDefs(
 		if (!(thisLineDef->isValid)) {continue;}
 		(*numValidLineDefs)++;
 		sorts[numSorts++] = (LineDefSort_t){
-			.distance=fabsf(r_getLineDefDistance(thisLineDef, camera.position)),
+			.distance=f_abs(r_getLineDefDistance(thisLineDef, camera.position)),
 			.lineDef=thisLineDef
 		};
 	}
 
-	qsort(sorts, numSorts, sizeof(LineDefSort_t), r_compareSorts);
+	v_sort(sorts, numSorts, sizeof(LineDefSort_t), r_compareSorts);
 
 	for (unsigned int sortIndex=0u; sortIndex<numSorts; sortIndex++) {result[sortIndex] = sorts[sortIndex].lineDef;}
 
-	free(sorts);
+	sys_free(sorts);
 }
 
 
@@ -824,7 +737,7 @@ void r_drawFrame(void) {
 
 
 	//Sort near-to-far.
-	LineDef_t** sortedLineDefs = calloc(g_numLineDefs, sizeof(LineDef_t*));
+	LineDef_t** sortedLineDefs = sys_calloc(g_numLineDefs, sizeof(LineDef_t*));
 	unsigned int numValidLineDefs = 0u;
 	r_sortLineDefs(sortedLineDefs, &numValidLineDefs);
 
@@ -842,7 +755,7 @@ void r_drawFrame(void) {
 		r_drawLineDef(thisLineDef, fbPTR);
 	}
 
-	free(sortedLineDefs);
+	sys_free(sortedLineDefs);
 }
 //////// DRAWING ////////
 
@@ -857,36 +770,9 @@ void r_initCamera(void) {
 	camera = (Camera_t){
 		.position=(Vec2f_t){.x=0.0f, .y=0.0f},
 		.yaw=0.0f, .FOV=1.22173f, //70 degrees in radians
-		.near=0.1f,
-		.far=128.0f,
+		.near=0.1f, .far=128.0f,
 		.forward=(Vec2f_t){.x=0.0f, .y=1.0f}
 	};
-}
-
-
-int r_loadTextures(const char** texturePaths, const unsigned int numTexturePaths) {
-	unsigned int numValidTextures = 0u;
-	for (unsigned int i=0u; i<numTexturePaths; i++) {
-		const char* path = texturePaths[i];
-
-		RGB_t* pixelData;
-		if (!r_loadTexture(path, &pixelData)) {printf("Failed to load [%s]\n", path); return FALSE; /* Failed to load texture */}
-
-		textures[i] = pixelData;
-		printf("Loaded [%s] successfully.\n", path);
-	}
-
-
-	//Create colourMap lookup values.
-	for (unsigned int lightLevel=0u; lightLevel<=0xFFu; lightLevel++) {
-		for (unsigned int channelValue=0u; channelValue<=0xFFu; channelValue++) {
-			colourMap[lightLevel][channelValue] = (uint8_t)(
-				(float)(lightLevel) * (float)(channelValue) / 255.0f
-			);
-		}
-	}
-
-	return TRUE; //Success
 }
 //////// INITIALISATION ////////
 

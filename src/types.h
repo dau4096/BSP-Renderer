@@ -12,16 +12,17 @@
 
 
 //Colours
-typedef struct {uint8_t r, g, b;} RGB_t;
-#define RGB_BLACK 	((RGB_t){  0u,   0u,   0u})
-#define RGB_GREY 	((RGB_t){127u, 127u, 127u})
-#define RGB_WHITE 	((RGB_t){255u, 255u, 255u})
-#define RGB_RED 	((RGB_t){255u,   0u,   0u})
-#define RGB_GREEN 	((RGB_t){  0u, 255u,   0u})
-#define RGB_BLUE 	((RGB_t){  0u,   0u, 255u})
-#define RGB_YELLOW 	((RGB_t){255u, 255u,   0u})
-#define RGB_CYAN 	((RGB_t){  0u, 255u, 255u})
-#define RGB_MAGENTA ((RGB_t){255u,   0u, 255u})
+typedef uint16_t RGB_t;
+//Converted using RGB565.py from their RGBunpack_t counterparts.
+#define RGB_BLACK 	((RGB_t)(0x0000))
+#define RGB_GREY 	((RGB_t)(0x7BEF))
+#define RGB_WHITE 	((RGB_t)(0xFFFF))
+#define RGB_RED 	((RGB_t)(0xF800))
+#define RGB_GREEN 	((RGB_t)(0x07E0))
+#define RGB_BLUE 	((RGB_t)(0x001F))
+#define RGB_YELLOW 	((RGB_t)(0xFFE0))
+#define RGB_CYAN 	((RGB_t)(0x07FF))
+#define RGB_MAGENTA ((RGB_t)(0xF81F))
 
 
 //Vectors
@@ -62,7 +63,6 @@ typedef struct {
 typedef struct {
 	int valid;
 	RGB_t* data;
-	Vec2i_t resolution;
 } Buffer_t;
 
 
