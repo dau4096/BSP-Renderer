@@ -215,6 +215,9 @@ void p_updateCamera(Camera_t* camera) {
 	motion.delta=v2f_sub(motion.end, motion.start);
 
 
+	if (currentSectorID >= g_numSectors) {return; /* Skip logic, as you're in an invalid sector. */}
+
+
 	Sector_t* thisSector;
 	p_getSectorID(
 		camera,	&thisSector, &motion

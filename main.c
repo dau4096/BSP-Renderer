@@ -46,9 +46,6 @@ int main(void) {
 	unsigned int frameNumber = 0u;
 	int RUN = TRUE;
 	do { //Frameloop
-		io_pollEvents(&RUN);
-
-
 		//Tasks for this frame;
 		p_updateCamera(r_camera);
 
@@ -57,7 +54,8 @@ int main(void) {
 		
 		t_drawFramebuffer();
 
-
+		//Poll for next frame.
+		io_pollEvents(&RUN);
 		frameNumber++;
 	} while (RUN && !(keyMapPress[K_QUIT]));
 

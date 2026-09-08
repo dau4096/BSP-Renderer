@@ -21,6 +21,8 @@ KeyCode_e io_getID(const int key) {
 	//Assigns PRIZM keys to internal key enums.
 	switch (key) {
 		case KEY_CTRL_EXE: {return K_QUIT;}
+		case KEY_CTRL_EXIT: {return K_QUIT;}
+		case KEY_CTRL_QUIT: {return K_QUIT;}
 
 		case KEY_CHAR_8: {return K_MOVE_FORE;}  //NP8
 		case KEY_CHAR_2: {return K_MOVE_BACK;}  //NP2
