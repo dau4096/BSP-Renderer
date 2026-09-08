@@ -57,6 +57,7 @@ void io_pollEvents(int* RUN) {
 
 	KeyCode_e namedAction = io_getID(key);
 	if (namedAction != K_INVALID) {keyMapHold[namedAction] = TRUE;}
+	if (namedAction == K_QUIT) {*RUN = FALSE;}
 
 
 	for (unsigned int i=0u; i<NUM_KEYS; i++) {
