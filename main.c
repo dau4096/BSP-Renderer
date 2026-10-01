@@ -9,7 +9,7 @@
 
 #include "src/types.h"
 #include "src/io.h"
-#include "src/loader.h"
+#include "src/file.h"
 #include "src/terminal.h"
 #include "src/graphics.h"
 #include "src/ui.h"
@@ -72,7 +72,7 @@ int main(int argc, char* argv[]) {
 
 
 	r_initCamera();
-	int loadXMLSuccess = l_loadGeo(xmlFileName);
+	int loadXMLSuccess = f_loadGeo(xmlFileName);
 	if (!loadXMLSuccess) {
 		//Failed to read an XML file properly
 		printf("Failed to read XML file.\n");
@@ -124,6 +124,15 @@ int main(int argc, char* argv[]) {
 		mt_setDrawReady();
 	#endif
 		fflush(stdout);
+
+
+
+		//Check for screenshot key press.
+		if (keyMapPress[K_SCREENSHOT]) {
+			int fWriteSuccess = f_writeHTMLScreenshot("screenshot.html");
+			run = FALSE;
+			if (!fWriteSuccess) {run = FALSE;}
+		}
 
 
 		dt = now() - start;

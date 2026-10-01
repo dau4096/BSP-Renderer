@@ -1,4 +1,4 @@
-/* loader.c */
+/* file.c */
 
 #include <stdio.h>
 #include <string.h>
@@ -8,11 +8,12 @@
 
 #include "types.h"
 #include "graphics.h" //For the geometry datasets
+#include "terminal.h" //For HTML framebuffer conversions
 
 
 
-
-static xmlNode* l_findChildNode(const xmlNode* parent, const char* name) {
+//////// XML FILE UTILITIES ////////
+static xmlNode* f_findChildNode(const xmlNode* parent, const char* name) {
 	for (xmlNode* node=parent->children; node; node=node->next) {
 		if (
 			(node->type == XML_ELEMENT_NODE) &&
@@ -24,7 +25,7 @@ static xmlNode* l_findChildNode(const xmlNode* parent, const char* name) {
 	return NULL;
 }
 
-static unsigned int l_getNumChildElements(const xmlNode* parent) {
+static unsigned int f_getNumChildElements(const xmlNode* parent) {
 	unsigned int count = 0u;
 	for (xmlNode* child=parent->children; child; child=child->next) {
 		if (child->type == XML_ELEMENT_NODE) {count++;}
@@ -36,7 +37,7 @@ static unsigned int l_getNumChildElements(const xmlNode* parent) {
 
 
 
-static const char* l_getStrAttr(const xmlNode* node, const char* name) {
+static const char* f_getStrAttr(const xmlNode* node, const char* name) {
     xmlChar* value = xmlGetProp(node, BAD_CAST name);
     if (!value) {return NULL;}
 
@@ -46,7 +47,7 @@ static const char* l_getStrAttr(const xmlNode* node, const char* name) {
 }
 
 
-static int l_getIntAttr(const xmlNode* node, const char* name, const int defaultValue) {
+static int f_getIntAttr(const xmlNode* node, const char* name, const int defaultValue) {
 	xmlChar* value = xmlGetProp(node, BAD_CAST name);
     if (!value) {return defaultValue;}
 	int result = (int)(strtol((const char*)(value), NULL, 10)); //Accept decimal only
@@ -55,7 +56,7 @@ static int l_getIntAttr(const xmlNode* node, const char* name, const int default
 }
 
 
-static unsigned int l_getUIntAttr(const xmlNode* node, const char* name, const unsigned int defaultValue) {
+static unsigned int f_getUIntAttr(const xmlNode* node, const char* name, const unsigned int defaultValue) {
 	xmlChar* value = xmlGetProp(node, BAD_CAST name);
     if (!value) {return defaultValue;}
 	int result = (unsigned int)(strtoul((const char*)(value), NULL, 0)); //Accept decimal and hexadecimal.
@@ -64,7 +65,7 @@ static unsigned int l_getUIntAttr(const xmlNode* node, const char* name, const u
 }
 
 
-static float l_getFloatAttr(const xmlNode* node, const char* name, const float defaultValue) {
+static float f_getFloatAttr(const xmlNode* node, const char* name, const float defaultValue) {
 	xmlChar* value = xmlGetProp(node, BAD_CAST name);
     if (!value) {return 0.0f;}
 	float result = strtof((const char*)(value), NULL);
@@ -73,8 +74,8 @@ static float l_getFloatAttr(const xmlNode* node, const char* name, const float d
 }
 
 
-static RGB_t l_getColourAttr(const xmlNode* node, const char* name, const RGB_t defaultValue) {
-	const char* strAttr = l_getStrAttr(node, name);
+static RGB_t f_getColourAttr(const xmlNode* node, const char* name, const RGB_t defaultValue) {
+	const char* strAttr = f_getStrAttr(node, name);
 	if (!strAttr) {return defaultValue;}
 
 	//Parse individually as R/G/B hex.
@@ -89,7 +90,7 @@ static RGB_t l_getColourAttr(const xmlNode* node, const char* name, const RGB_t 
 }
 
 
-static void l_getLineDefsArrayAttr(
+static void f_getLineDefsArrayAttr(
 	const unsigned int sectorID,
 	unsigned int** lineDefsArr, unsigned int* numLineDefs
 ) {
@@ -113,7 +114,7 @@ static void l_getLineDefsArrayAttr(
 
 unsigned int numAssignedTextures;
 const char* textureNames[MAX_TEXTURES];
-static unsigned int l_assignTextureIndex(const char* filePath) {
+static unsigned int f_assignTextureIndex(const char* filePath) {
 	if (!filePath) {return fallbackTextureIndex;}
 
 	for (unsigned int i=0u; i<numAssignedTextures; i++) {
@@ -125,6 +126,7 @@ static unsigned int l_assignTextureIndex(const char* filePath) {
 	textureNames[numAssignedTextures] = filePath;
 	return numAssignedTextures++;
 }
+//////// XML FILE UTILITIES ////////
 
 
 
@@ -132,8 +134,9 @@ static unsigned int l_assignTextureIndex(const char* filePath) {
 
 
 
-int l_getVertices(const xmlNode* root) {
-	const xmlNode* verticesNode = l_findChildNode(root, "vertices");
+//////// XML FILE READING ////////
+int f_getVertices(const xmlNode* root) {
+	const xmlNode* verticesNode = f_findChildNode(root, "vertices");
 	if (!verticesNode) {
 		//Failiure
 		printf("Missing <vertices> XML node.\n");
@@ -141,15 +144,15 @@ int l_getVertices(const xmlNode* root) {
 	}
 
 
-	g_numVertices = l_getNumChildElements(verticesNode);
+	g_numVertices = f_getNumChildElements(verticesNode);
 	g_vertices = calloc(g_numVertices, sizeof(Vec2f_t));
 
 	//Parse each in order.
 	Vec2f_t* geoIndex = g_vertices; //Moving ptr
 	for (xmlNode* vertNode=verticesNode->children; vertNode; vertNode=vertNode->next) {
 		*(geoIndex++) = (Vec2f_t){
-			.x=l_getFloatAttr(vertNode, "x", 0.0f),
-			.y=l_getFloatAttr(vertNode, "y", 0.0f)
+			.x=f_getFloatAttr(vertNode, "x", 0.0f),
+			.y=f_getFloatAttr(vertNode, "y", 0.0f)
 		};
 	}
 
@@ -159,8 +162,8 @@ int l_getVertices(const xmlNode* root) {
 
 
 
-int l_getLineDefs(const xmlNode* root) {
-	const xmlNode* lineDefsNode = l_findChildNode(root, "lineDefs");
+int f_getLineDefs(const xmlNode* root) {
+	const xmlNode* lineDefsNode = f_findChildNode(root, "lineDefs");
 	if (!lineDefsNode) {
 		//Failiure
 		printf("Missing <lineDefs> XML node.\n");
@@ -168,18 +171,18 @@ int l_getLineDefs(const xmlNode* root) {
 	}
 
 
-	g_numLineDefs = l_getNumChildElements(lineDefsNode);
+	g_numLineDefs = f_getNumChildElements(lineDefsNode);
 	g_lineDefs = calloc(g_numLineDefs, sizeof(LineDef_t));
 
 	//Parse each in order.
 	LineDef_t* geoIndex = g_lineDefs; //Moving ptr
 	for (xmlNode* ldNode=lineDefsNode->children; ldNode; ldNode=ldNode->next) {
-		const char* textureName = l_getStrAttr(ldNode, "texture");
-		unsigned int textureIndex = l_assignTextureIndex(textureName);
+		const char* textureName = f_getStrAttr(ldNode, "texture");
+		unsigned int textureIndex = f_assignTextureIndex(textureName);
 		
 		//If either of these fail, they will default to -1. This can this be taken as a faliure to load.
-		int start = l_getIntAttr(ldNode, "v0", -1);
-		int end = l_getIntAttr(ldNode, "v1", -1);
+		int start = f_getIntAttr(ldNode, "v0", -1);
+		int end = f_getIntAttr(ldNode, "v1", -1);
 
 		if ((start < 0) || (end < 0)) {
 			//Was not provided.
@@ -199,8 +202,8 @@ int l_getLineDefs(const xmlNode* root) {
 			return FALSE;
 		}
 
-		int front = l_getIntAttr(ldNode, "front", 0);
-		int back = l_getIntAttr(ldNode, "back", 0);
+		int front = f_getIntAttr(ldNode, "front", 0);
+		int back = f_getIntAttr(ldNode, "back", 0);
 		if (front < 0) {
 			if (back < 0) {
 				printf("Linedef %lu is missing front-sector index", geoIndex - g_lineDefs);
@@ -226,8 +229,8 @@ int l_getLineDefs(const xmlNode* root) {
 
 
 
-int l_getSectors(const xmlNode* root) {
-	const xmlNode* sectorsNode = l_findChildNode(root, "sectors");
+int f_getSectors(const xmlNode* root) {
+	const xmlNode* sectorsNode = f_findChildNode(root, "sectors");
 	if (!sectorsNode) {
 		//Failiure
 		printf("Missing <sectors> XML node.\n");
@@ -235,18 +238,18 @@ int l_getSectors(const xmlNode* root) {
 	}
 
 
-	g_numSectors = l_getNumChildElements(sectorsNode);
+	g_numSectors = f_getNumChildElements(sectorsNode);
 	g_sectors = calloc(g_numSectors, sizeof(Sector_t));
 
 	//Parse each in order.
 	Sector_t* geoIndex = g_sectors; //Moving ptr
 	for (xmlNode* secNode=sectorsNode->children; secNode; secNode=secNode->next) {
 		unsigned int* lineDefsArr; unsigned int numLineDefs;
-		l_getLineDefsArrayAttr(geoIndex-g_sectors, &lineDefsArr, &numLineDefs);
+		f_getLineDefsArrayAttr(geoIndex-g_sectors, &lineDefsArr, &numLineDefs);
 
 
-		const char* floorTextureName = l_getStrAttr(secNode, "floorTexture");
-		const char* ceilTextureName = l_getStrAttr(secNode, "ceilTexture");
+		const char* floorTextureName = f_getStrAttr(secNode, "floorTexture");
+		const char* ceilTextureName = f_getStrAttr(secNode, "ceilTexture");
 		const uint8_t flags =  (
 			((floorTextureName) ? 1u : 0u) | //Bit 0: floor colour/texture
 			((ceilTextureName ? 1u : 0u) << 1) //Bit 1: ceil colour/texture
@@ -257,22 +260,22 @@ int l_getSectors(const xmlNode* root) {
 	#endif
 
 		int floorSuccess, ceilSuccess;
-		const RGB_t floorColour = l_getColourAttr(secNode, "floorColour", RGB_MAGENTA);
-		const RGB_t ceilColour = l_getColourAttr(secNode, "ceilColour", RGB_CYAN);
+		const RGB_t floorColour = f_getColourAttr(secNode, "floorColour", RGB_MAGENTA);
+		const RGB_t ceilColour = f_getColourAttr(secNode, "ceilColour", RGB_CYAN);
 
 		*(geoIndex++) = (Sector_t){
-			.floorHeight=l_getFloatAttr(secNode, "floorZ", -1.0f),
-			.floorTexture=l_assignTextureIndex(floorTextureName),
+			.floorHeight=f_getFloatAttr(secNode, "floorZ", -1.0f),
+			.floorTexture=f_assignTextureIndex(floorTextureName),
 			.floorColour=floorColour,
 
-			.ceilingHeight=l_getFloatAttr(secNode, "ceilZ", 1.0f),
-			.ceilingTexture=l_assignTextureIndex(ceilTextureName),
+			.ceilingHeight=f_getFloatAttr(secNode, "ceilZ", 1.0f),
+			.ceilingTexture=f_assignTextureIndex(ceilTextureName),
 			.ceilingColour=ceilColour,
 
 			.flags=flags,
 
 			.lineDefs=lineDefsArr, .numLineDefs=numLineDefs,
-			.lightLevel=l_getUIntAttr(secNode, "lightLevel", 255u)
+			.lightLevel=f_getUIntAttr(secNode, "lightLevel", 255u)
 		};
 	}
 
@@ -283,20 +286,20 @@ int l_getSectors(const xmlNode* root) {
 
 
 
-int l_repositionCamera(const xmlNode* root) {
+int f_repositionCamera(const xmlNode* root) {
 	//Moves and rotates camera to correct starting position.
 	//Deals with *r_camera ptr.
-	const xmlNode* cameraNode = l_findChildNode(root, "camera");
+	const xmlNode* cameraNode = f_findChildNode(root, "camera");
 	if (!cameraNode) {
 		//Failiure
 		printf("Missing <camera> XML node.\n");
 		return FALSE;
 	}
 
-	r_camera->position.x = l_getFloatAttr(cameraNode, "x", 0.0f);
-	r_camera->position.y = l_getFloatAttr(cameraNode, "y", 0.0f);
+	r_camera->position.x = f_getFloatAttr(cameraNode, "x", 0.0f);
+	r_camera->position.y = f_getFloatAttr(cameraNode, "y", 0.0f);
 
-	r_camera->yaw = l_getFloatAttr(cameraNode, "yaw", 0.0f);
+	r_camera->yaw = f_getFloatAttr(cameraNode, "yaw", 0.0f);
 
 	//Sector_t * currentSector = p_findCurrentSectorSlow(r_camera);
 	Sector_t* currentSector = g_sectors; //Use g_sectors[0] until I figure out a good method to implement the above.
@@ -308,7 +311,7 @@ int l_repositionCamera(const xmlNode* root) {
 
 
 
-int l_loadGeo(const char* filePath) {
+int f_loadGeo(const char* filePath) {
 	//Loads some file into the geometry datasets provided.
 	//Returns success
 
@@ -319,7 +322,7 @@ int l_loadGeo(const char* filePath) {
 
 
 	numAssignedTextures = 0u;
-	fallbackTextureIndex = l_assignTextureIndex(FALLBACK_TEXTURE_PATH);
+	fallbackTextureIndex = f_assignTextureIndex(FALLBACK_TEXTURE_PATH);
 
 
 	//Read the file
@@ -335,16 +338,16 @@ int l_loadGeo(const char* filePath) {
 
 	//Parse in order
 	if (
-		!l_getVertices(root) ||
-		!l_getLineDefs(root) ||
-		!l_getSectors(root)
+		!f_getVertices(root) ||
+		!f_getLineDefs(root) ||
+		!f_getSectors(root)
 	) {
 		return FALSE; //Any of those 3 failed.
 	}
 
 
 	//Read camera start information
-	if (!l_repositionCamera(root)) {return FALSE; /* Could not move camera */}
+	if (!f_repositionCamera(root)) {return FALSE; /* Could not move camera */}
 
 
 	//Load all textures;
@@ -356,6 +359,28 @@ int l_loadGeo(const char* filePath) {
 
 	return TRUE;
 }
+//////// XML FILE READING ////////
 
 
+
+
+
+
+//////// FILE WRITING ////////
+int f_writeHTMLScreenshot(const char* filePath) {
+	char* HTMLcontents;
+	unsigned int HTMLbufferSize;
+	t_getHTML(&HTMLcontents, &HTMLbufferSize);
+
+	FILE* fPTR;
+	fPTR = fopen(filePath, "w");
+	if (fPTR == NULL) {printf("Failed to write screenshot."); return FALSE;}
+
+	fputs(HTMLcontents, fPTR);
+	fputs("\n", fPTR);
+	fclose(fPTR);
+
+	return TRUE;
+}
+//////// FILE WRITING ////////
 

@@ -11,6 +11,7 @@ extern Buffer_t framebuffer;
 
 //////// UTILITY ////////
 Vec2i_t t_getTerminalSize(void);
+void t_getHTML(char** buf, unsigned int* size);
 //////// UTILITY ////////
 
 

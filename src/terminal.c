@@ -50,6 +50,205 @@ Vec2i_t t_getTerminalSize(void) {
 }
 
 #endif
+
+
+
+
+
+//////// STRING UTILITY ////////
+static inline char* strAppend(char *dst, const char *src) {
+	while (*src) {*dst++ = *src++;} //Append using ptrs.
+	return dst;
+}
+
+
+static inline char* intAppend(char *dst, int v) {
+	//Append an integer, formatted correctly for an ANSI escape code.
+	char tmp[12];
+	int i = 0;
+
+	if (v == 0) {
+		*dst++ = '0';
+		return dst;
+	}
+
+	while (v > 0) {
+		tmp[i++] = '0' + (v % 10);
+		v /= 10;
+	}
+
+	while (i--) {*dst++ = tmp[i];}
+	return dst;
+}
+
+
+static inline char* setForeground(char *out, const RGB_t c) {
+	*out++ = '\x1b'; *out++ = '['; *out++ = '3'; *out++ = '8'; *out++ = ';'; *out++ = '2'; *out++ = ';'; //"\x1b[38;2;"
+	out = intAppend(out, c.r); *out++ = ';';
+	out = intAppend(out, c.g); *out++ = ';';
+	out = intAppend(out, c.b); *out++ = 'm';
+	return out;
+}
+
+static inline char* setBackground(char *out, const RGB_t c) {
+	*out++ = '\x1b'; *out++ = '['; *out++ = '4'; *out++ = '8'; *out++ = ';'; *out++ = '2'; *out++ = ';'; //"\x1b[48;2;"
+	out = intAppend(out, c.r); *out++ = ';';
+	out = intAppend(out, c.g); *out++ = ';';
+	out = intAppend(out, c.b); *out++ = 'm';
+	return out;
+}
+
+
+
+void t_clearLowestNLines(unsigned int N) {
+	if (framebuffer.resolutionCHARS.y < N) {return;}
+	unsigned int startRow = framebuffer.resolutionCHARS.y - N + 1u;
+	printf("\033[%u;1H", startRow); //Move to first of bottom N lines
+    printf("\033[J"); //Clear then onward.
+}
+
+
+void t_resetCursor(void) {
+	t_clearLowestNLines(UI_HEIGHT);
+	printf("\x1b[1;1H"); //Moves cursor to the top-left.
+}
+//////// STRING UTILITY ////////
+
+
+
+
+
+#define PREFIX_SIZE 5u /* <pre> */
+#define SUFFIX_SIZE 6u /* </pre> */
+#define SPAN_START_SIZE 61u /* <span style="background-color:#XXXXXX"><font color="#YYYYYY"> */
+#define SPAN_END_SIZE 14u /* </font></span> */
+#define NEWLINE_SIZE 1u /* \n | 0x0A */
+
+unsigned int t_getHTMLbufSize(void) {
+	unsigned int bufSize = PREFIX_SIZE + SPAN_START_SIZE + SPAN_END_SIZE + SUFFIX_SIZE;
+	RGB_t topPrev = RGB_BLACK;RGB_t lowPrev = RGB_BLACK;
+	int hasReset = TRUE; ///May not be accurate, force a colour change.
+
+	for (uint y=framebuffer.resolutionPX.y-2; y>0u; y-=2u) {
+		for (uint x=0u; x<framebuffer.resolutionPX.x; x++) {
+
+			int topIndex = (y * framebuffer.resolutionPX.x) + x;
+			int lowIndex = ((y + 1) * framebuffer.resolutionPX.x) + x;
+
+			RGB_t top = (y + 1 < framebuffer.resolutionPX.y) ? framebuffer.backData[lowIndex] : RGB_BLACK;
+			RGB_t low = framebuffer.backData[topIndex];
+
+
+			//Check if the colour needs to change.
+			if (hasReset || (top.r != topPrev.r) || (top.g != topPrev.g) || (top.b != topPrev.b)) {
+				bufSize += SPAN_END_SIZE + SPAN_START_SIZE; //Start new span.
+				topPrev = top;
+			}
+			if (hasReset || (low.r != lowPrev.r) || (low.g != lowPrev.g) || (low.b != lowPrev.b)) {
+				bufSize += SPAN_END_SIZE + SPAN_START_SIZE; //Start new span.
+				lowPrev = low;
+			}
+
+
+			bufSize++; //Represents adding a UTF8 "▀" char
+			hasReset = FALSE; //Has not reset, free to assume continuous colour.
+		}
+
+		bufSize += NEWLINE_SIZE; //Adding a newline.
+		topPrev = RGB_BLACK;
+		lowPrev = RGB_BLACK;
+		hasReset = TRUE;
+	}
+
+
+	return bufSize;
+}
+
+
+
+char* t_getColourCode(const RGB_t colour) {
+	char* buf = calloc(8, sizeof(char));
+	sprintf(
+		buf, "#%02X%02X%02X",
+		colour.r, colour.g, colour.b
+	);
+	return buf;
+}
+
+
+void t_getSpanStartChars(char** buf, const RGB_t bg, const RGB_t fg) {
+	sprintf(
+		*buf, "<span style=\"background-color:%s\"><font color=\"%s\">",
+		t_getColourCode(bg), t_getColourCode(fg)
+	);
+}
+
+
+void t_getHTML(char** buf, unsigned int* size) {
+	*size = 0u;
+	if (!framebuffer.valid) {return;}
+
+	*size = t_getHTMLbufSize();
+	*buf = (char*)(calloc(*size, sizeof(char)));
+	char* bufPTR = *buf;
+
+
+	char* PREFIX_CHARS = "<pre>";
+	char* SUFFIX_CHARS = "</pre>";
+	char* SPAN_START_CHARS = calloc(SPAN_START_SIZE, sizeof(char));
+	char* SPAN_END_CHARS = "</font></span>";
+	char* NEWLINE_CHARS = "\n";
+
+	strAppend(bufPTR, PREFIX_CHARS);
+	strAppend(bufPTR, SPAN_START_CHARS);
+
+
+	RGB_t topPrev = RGB_BLACK;
+	RGB_t lowPrev = RGB_BLACK;
+	int hasReset = TRUE; ///May not be accurate, force a colour change.
+
+	for (uint y=framebuffer.resolutionPX.y-2; y>0u; y-=2u) {
+		for (uint x=0u; x<framebuffer.resolutionPX.x; x++) {
+
+			int topIndex = (y * framebuffer.resolutionPX.x) + x;
+			int lowIndex = ((y + 1) * framebuffer.resolutionPX.x) + x;
+
+			RGB_t top = (y + 1 < framebuffer.resolutionPX.y) ? framebuffer.backData[lowIndex] : RGB_BLACK;
+			RGB_t low = framebuffer.backData[topIndex];
+
+
+			//Check if the colour needs to change.
+			if (hasReset || (top.r != topPrev.r) || (top.g != topPrev.g) || (top.b != topPrev.b)) {
+				strAppend(bufPTR, SPAN_END_CHARS); bufPTR += SPAN_END_SIZE; //End previous span.
+				t_getSpanStartChars(&SPAN_START_CHARS, low, top);
+				strAppend(bufPTR, SPAN_START_CHARS); bufPTR += SPAN_START_SIZE; //Start new span.
+				topPrev = top;
+			}
+			if (hasReset || (low.r != lowPrev.r) || (low.g != lowPrev.g) || (low.b != lowPrev.b)) {
+				strAppend(bufPTR, SPAN_END_CHARS); bufPTR += SPAN_END_SIZE; //End previous span.
+				t_getSpanStartChars(&SPAN_START_CHARS, low, top);
+				strAppend(bufPTR, SPAN_START_CHARS); bufPTR += SPAN_START_SIZE; //Start new span.
+				lowPrev = low;
+			}
+
+
+			*bufPTR++ = '\xE2'; //UTF8 "▀" char
+			*bufPTR++ = '\x96';
+			*bufPTR++ = '\x80';
+			hasReset = FALSE; //Has not reset, free to assume continuous colour.
+		}
+
+		strAppend(bufPTR, NEWLINE_CHARS); bufPTR += NEWLINE_SIZE; //Adding a newline.
+		topPrev = RGB_BLACK;
+		lowPrev = RGB_BLACK;
+		hasReset = TRUE;
+	}
+
+	strAppend(bufPTR, SPAN_END_CHARS);
+	strAppend(bufPTR, SUFFIX_CHARS);
+
+	free(SPAN_START_CHARS);
+}
 //////// UTILITY ////////
 
 
@@ -129,63 +328,6 @@ RGB_t t_readPX(const Vec2i_t position) {
 
 
 
-
-static inline char* strAppend(char *dst, const char *src) {
-	while (*src) {*dst++ = *src++;} //Append using ptrs.
-	return dst;
-}
-
-
-static inline char* intAppend(char *dst, int v) {
-	//Append an integer, formatted correctly for an ANSI escape code.
-	char tmp[12];
-	int i = 0;
-
-	if (v == 0) {
-		*dst++ = '0';
-		return dst;
-	}
-
-	while (v > 0) {
-		tmp[i++] = '0' + (v % 10);
-		v /= 10;
-	}
-
-	while (i--) {*dst++ = tmp[i];}
-	return dst;
-}
-
-
-static inline char* setForeground(char *out, const RGB_t c) {
-	*out++ = '\x1b'; *out++ = '['; *out++ = '3'; *out++ = '8'; *out++ = ';'; *out++ = '2'; *out++ = ';'; //"\x1b[38;2;"
-	out = intAppend(out, c.r); *out++ = ';';
-	out = intAppend(out, c.g); *out++ = ';';
-	out = intAppend(out, c.b); *out++ = 'm';
-	return out;
-}
-
-static inline char* setBackground(char *out, const RGB_t c) {
-	*out++ = '\x1b'; *out++ = '['; *out++ = '4'; *out++ = '8'; *out++ = ';'; *out++ = '2'; *out++ = ';'; //"\x1b[48;2;"
-	out = intAppend(out, c.r); *out++ = ';';
-	out = intAppend(out, c.g); *out++ = ';';
-	out = intAppend(out, c.b); *out++ = 'm';
-	return out;
-}
-
-
-
-void t_clearLowestNLines(unsigned int N) {
-	if (framebuffer.resolutionCHARS.y < N) {return;}
-	unsigned int startRow = framebuffer.resolutionCHARS.y - N + 1u;
-	printf("\033[%u;1H", startRow); //Move to first of bottom N lines
-    printf("\033[J"); //Clear then onward.
-}
-
-
-void t_resetCursor(void) {
-	t_clearLowestNLines(UI_HEIGHT);
-	printf("\x1b[1;1H"); //Moves cursor to the top-left.
-}
 
 
 #define WIDTH  (framebuffer.resolutionPX.x)

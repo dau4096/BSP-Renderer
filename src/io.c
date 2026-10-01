@@ -131,6 +131,8 @@ int getID(int key) {
 		case KEY_LEFT: {return K_TURN_LEFT;}
 		case KEY_RIGHT: {return K_TURN_RIGHT;}
 
+		case KEY_Q: {return K_SCREENSHOT;}
+
 
 	#ifdef DEBUG_DRAW_ORDER
 		case KEY_2: {return K_DEBUG_DRAW_INC;}
@@ -209,6 +211,8 @@ static int getID(int vk) {
 
 		case VK_LEFT:  {return K_TURN_LEFT;}
 		case VK_RIGHT: {return K_TURN_RIGHT;}
+
+		case 'Q': {return K_SCREENSHOT;}
 
 		default: {return NUM_KEYS;}
 	}
