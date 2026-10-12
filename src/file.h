@@ -12,7 +12,9 @@ int f_loadGeo(const char* filePath);
 
 
 //////// FILE WRITING ////////
-int f_writeHTMLScreenshot(const char* filePath);
+int f_writeHTMLScreenshot(const char* filePath, const Vec2i_t resolution, const int uiHeight);
+
+void f_getScreenshotFileName(char** filePath, unsigned int* length, const unsigned int frameNumber);
 //////// FILE WRITING ////////
 
 

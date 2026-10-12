@@ -2,13 +2,16 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <libxml/parser.h>
 #include <libxml/tree.h>
+#include <time.h>
 
 
 #include "types.h"
 #include "graphics.h" //For the geometry datasets
 #include "terminal.h" //For HTML framebuffer conversions
+#include "ui.h" //For HTML UI conversions
 
 
 
@@ -367,20 +370,49 @@ int f_loadGeo(const char* filePath) {
 
 
 //////// FILE WRITING ////////
-int f_writeHTMLScreenshot(const char* filePath) {
-	char* HTMLcontents;
-	unsigned int HTMLbufferSize;
-	t_getHTML(&HTMLcontents, &HTMLbufferSize);
+int f_writeHTMLScreenshot(const char* filePath, const Vec2i_t resolution, const int uiHeight) {
+	//File identifier as HTML content.
+	char* filePrefix = "<!DOCTYPE html>\n";
 
+	//Get framebuffer as HTML content.
+	char* HTMLframebufferContents;
+	unsigned int HTMLframebufferSize;
+	t_getHTML(&HTMLframebufferContents, &HTMLframebufferSize);
+
+
+	//Get UI as HTML content.
+	char* HTMLuiContents;
+	unsigned int HTMLuiSize;
+	ui_getHTML(resolution, uiHeight, &HTMLuiContents, &HTMLuiSize);
+
+
+	//Open file.
 	FILE* fPTR;
 	fPTR = fopen(filePath, "w");
-	if (fPTR == NULL) {printf("Failed to write screenshot."); return FALSE;}
+	if (fPTR == NULL) {printf("Failed to write screenshot."); return FALSE; /* fopen fail */}
 
-	fputs(HTMLcontents, fPTR);
-	fputs("\n", fPTR);
+	//Write contents of file
+	fputs(filePrefix, fPTR);
+	fputs(HTMLframebufferContents, fPTR); fputs("\n", fPTR);
+	fputs(HTMLuiContents, fPTR); fputs("\n", fPTR);
+
+	//Close file
 	fclose(fPTR);
+	return TRUE; //Success
+}
 
-	return TRUE;
+
+void f_getScreenshotFileName(char** filePath, unsigned int* length, const unsigned int frameNumber) {
+	const unsigned int bufferSize = 25u + (frameNumber % 16u) + 1u;
+	*filePath = malloc(bufferSize * sizeof(char));
+	time_t currentTime;
+	time(&currentTime);
+
+	sprintf(
+		*filePath, "./screenshots/%X%X.screenshot.html",
+		currentTime, frameNumber
+	);
+	if (length) {*length = strlen(*filePath);}
 }
 //////// FILE WRITING ////////
 

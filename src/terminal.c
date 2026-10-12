@@ -1,6 +1,5 @@
 /* terminal.c */
 
-
 #include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
@@ -120,8 +119,8 @@ void t_resetCursor(void) {
 
 #define PREFIX_SIZE 5u /* <pre> */
 #define SUFFIX_SIZE 6u /* </pre> */
-#define SPAN_START_SIZE 61u /* <span style="background-color:#XXXXXX"><font color="#YYYYYY"> */
-#define SPAN_END_SIZE 14u /* </font></span> */
+#define SPAN_START_SIZE 53u /* <span style="background-color:#XXXXXX;color:#YYYYYY"> */
+#define SPAN_END_SIZE 7u /* </span> */
 #define NEWLINE_SIZE 1u /* \n | 0x0A */
 
 unsigned int t_getHTMLbufSize(void) {
@@ -178,7 +177,7 @@ char* t_getColourCode(const RGB_t colour) {
 
 void t_getSpanStartChars(char** buf, const RGB_t bg, const RGB_t fg) {
 	sprintf(
-		*buf, "<span style=\"background-color:%s\"><font color=\"%s\">",
+		*buf, "<span style=\"background-color:%s;color:%s\">",
 		t_getColourCode(bg), t_getColourCode(fg)
 	);
 }
@@ -196,16 +195,16 @@ void t_getHTML(char** buf, unsigned int* size) {
 	char* PREFIX_CHARS = "<pre>";
 	char* SUFFIX_CHARS = "</pre>";
 	char* SPAN_START_CHARS = calloc(SPAN_START_SIZE, sizeof(char));
-	char* SPAN_END_CHARS = "</font></span>";
+	char* SPAN_END_CHARS = "</span>";
 	char* NEWLINE_CHARS = "\n";
 
-	strAppend(bufPTR, PREFIX_CHARS);
-	strAppend(bufPTR, SPAN_START_CHARS);
+	strAppend(bufPTR, PREFIX_CHARS); bufPTR += PREFIX_SIZE;
 
 
 	RGB_t topPrev = RGB_BLACK;
 	RGB_t lowPrev = RGB_BLACK;
 	int hasReset = TRUE; ///May not be accurate, force a colour change.
+	int firstIter = TRUE; //Don't add </span> at the start.
 
 	for (uint y=framebuffer.resolutionPX.y-2; y>0u; y-=2u) {
 		for (uint x=0u; x<framebuffer.resolutionPX.x; x++) {
@@ -218,17 +217,14 @@ void t_getHTML(char** buf, unsigned int* size) {
 
 
 			//Check if the colour needs to change.
-			if (hasReset || (top.r != topPrev.r) || (top.g != topPrev.g) || (top.b != topPrev.b)) {
-				strAppend(bufPTR, SPAN_END_CHARS); bufPTR += SPAN_END_SIZE; //End previous span.
+			int topChange = (top.r != topPrev.r) || (top.g != topPrev.g) || (top.b != topPrev.b);
+			int lowChange = (low.r != lowPrev.r) || (low.g != lowPrev.g) || (low.b != lowPrev.b);
+			if (hasReset || topChange || lowChange) {
+				if (!firstIter) {strAppend(bufPTR, SPAN_END_CHARS); bufPTR += SPAN_END_SIZE;} //End previous span.
 				t_getSpanStartChars(&SPAN_START_CHARS, low, top);
 				strAppend(bufPTR, SPAN_START_CHARS); bufPTR += SPAN_START_SIZE; //Start new span.
-				topPrev = top;
-			}
-			if (hasReset || (low.r != lowPrev.r) || (low.g != lowPrev.g) || (low.b != lowPrev.b)) {
-				strAppend(bufPTR, SPAN_END_CHARS); bufPTR += SPAN_END_SIZE; //End previous span.
-				t_getSpanStartChars(&SPAN_START_CHARS, low, top);
-				strAppend(bufPTR, SPAN_START_CHARS); bufPTR += SPAN_START_SIZE; //Start new span.
-				lowPrev = low;
+				if (topChange) {topPrev = top;}
+				if (lowChange) {lowPrev = low;}
 			}
 
 
@@ -236,15 +232,19 @@ void t_getHTML(char** buf, unsigned int* size) {
 			*bufPTR++ = '\x96';
 			*bufPTR++ = '\x80';
 			hasReset = FALSE; //Has not reset, free to assume continuous colour.
+			firstIter = FALSE;
 		}
 
+
+		strAppend(bufPTR, SPAN_END_CHARS); bufPTR += SPAN_END_SIZE; //End previous span.
 		strAppend(bufPTR, NEWLINE_CHARS); bufPTR += NEWLINE_SIZE; //Adding a newline.
+		strAppend(bufPTR, SPAN_START_CHARS); bufPTR += SPAN_START_SIZE; //Start new span.
 		topPrev = RGB_BLACK;
 		lowPrev = RGB_BLACK;
 		hasReset = TRUE;
 	}
 
-	strAppend(bufPTR, SPAN_END_CHARS);
+	strAppend(bufPTR, SPAN_END_CHARS); bufPTR += SPAN_END_SIZE;
 	strAppend(bufPTR, SUFFIX_CHARS);
 
 	free(SPAN_START_CHARS);

@@ -6,6 +6,7 @@
 #include <math.h>
 #include <string.h>
 #include <pthread.h>
+#include <stdlib.h>
 
 #include "src/types.h"
 #include "src/io.h"
@@ -129,8 +130,10 @@ int main(int argc, char* argv[]) {
 
 		//Check for screenshot key press.
 		if (keyMapPress[K_SCREENSHOT]) {
-			int fWriteSuccess = f_writeHTMLScreenshot("screenshot.html");
-			run = FALSE;
+			char* screenshotFilePath;
+			f_getScreenshotFileName(&screenshotFilePath, nullptr, frameNumber);
+			int fWriteSuccess = f_writeHTMLScreenshot(screenshotFilePath, tResChars, UI_HEIGHT);
+			free(screenshotFilePath);
 			if (!fWriteSuccess) {run = FALSE;}
 		}
 
