@@ -131,7 +131,7 @@ int main(int argc, char* argv[]) {
 		//Check for screenshot key press.
 		if (keyMapPress[K_SCREENSHOT]) {
 			char* screenshotFilePath;
-			f_getScreenshotFileName(&screenshotFilePath, nullptr, frameNumber);
+			f_getScreenshotFileName(&screenshotFilePath, NULL, frameNumber);
 			int fWriteSuccess = f_writeHTMLScreenshot(screenshotFilePath, tResChars, UI_HEIGHT);
 			free(screenshotFilePath);
 			if (!fWriteSuccess) {run = FALSE;}

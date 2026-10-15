@@ -409,7 +409,7 @@ void f_getScreenshotFileName(char** filePath, unsigned int* length, const unsign
 	time(&currentTime);
 
 	sprintf(
-		*filePath, "./screenshots/%X%X.screenshot.html",
+		*filePath, "./screenshots/%lX%X.screenshot.html",
 		currentTime, frameNumber
 	);
 	if (length) {*length = strlen(*filePath);}

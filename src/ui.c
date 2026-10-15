@@ -124,7 +124,7 @@ void ui_drawInterface(const Vec2i_t resolution, const int uiHeight) {
 	char* uiBuffer = calloc(uiHeight * resolution.x, sizeof(char));
 	unsigned int uiBufferSize;
 	ui_getInterface(resolution, uiHeight, &uiBuffer, &uiBufferSize);
-	printf(uiBuffer);
+	printf("%s", uiBuffer);
 }
 
 
