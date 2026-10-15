@@ -10,9 +10,10 @@
 
 #include "types.h"
 #include "graphics.h" //For the geometry datasets
+#ifndef EDITOR
 #include "terminal.h" //For HTML framebuffer conversions
 #include "ui.h" //For HTML UI conversions
-
+#endif
 
 
 //////// XML FILE UTILITIES ////////
@@ -115,8 +116,8 @@ static void f_getLineDefsArrayAttr(
 }
 
 
-unsigned int numAssignedTextures;
-const char* textureNames[MAX_TEXTURES];
+static unsigned int numAssignedTextures;
+const static char* textureNames[MAX_TEXTURES];
 static unsigned int f_assignTextureIndex(const char* filePath) {
 	if (!filePath) {return fallbackTextureIndex;}
 
@@ -253,7 +254,7 @@ int f_getSectors(const xmlNode* root) {
 
 		const char* floorTextureName = f_getStrAttr(secNode, "floorTexture");
 		const char* ceilTextureName = f_getStrAttr(secNode, "ceilTexture");
-		const uint8_t flags =  (
+		uint8_t flags =  (
 			((floorTextureName) ? 1u : 0u) | //Bit 0: floor colour/texture
 			((ceilTextureName ? 1u : 0u) << 1) //Bit 1: ceil colour/texture
 		);
@@ -293,8 +294,9 @@ int f_repositionCamera(const xmlNode* root) {
 	//Moves and rotates camera to correct starting position.
 	//Deals with *r_camera ptr.
 	const xmlNode* cameraNode = f_findChildNode(root, "camera");
+#ifndef EDITOR
 	if (!cameraNode) {
-		//Failiure
+		//Couldn't find camera node.
 		printf("Missing <camera> XML node.\n");
 		return FALSE;
 	}
@@ -309,8 +311,29 @@ int f_repositionCamera(const xmlNode* root) {
 	r_camera->Z = currentSector->floorHeight;
 
 	return TRUE; //Success
-}
 
+#else
+	//Unused values.
+	r_camera->Z = 0.0f;
+	r_camera->forward = (Vec2f_t){.x=0.0f, .y=0.0f};
+	r_camera->Zvelocity = 0.0f;
+	r_camera->yaw = 0.0f;
+	r_camera->near = 0.0f;
+	r_camera->far = 0.0f;
+
+	r_camera->FOV = 1.0f; //Re-used as a sort of zoom value.
+
+	if (!cameraNode) {
+		//Couldn't find camera node.
+		r_camera->position = (Vec2f_t){.x=0.0f, .y=0.0f};
+	} else {
+		r_camera->position.x = f_getFloatAttr(cameraNode, "x", 0.0f);
+		r_camera->position.y = f_getFloatAttr(cameraNode, "y", 0.0f);
+	}
+
+	return TRUE;
+#endif
+}
 
 
 
@@ -353,9 +376,10 @@ int f_loadGeo(const char* filePath) {
 	if (!f_repositionCamera(root)) {return FALSE; /* Could not move camera */}
 
 
+	#ifndef EDITOR
 	//Load all textures;
 	if (!r_loadTextures(textureNames, numAssignedTextures)) {return FALSE; /* Could not load textures */}
-
+	#endif
 
 	//Cleanup
 	xmlFreeDoc(document);
@@ -370,6 +394,7 @@ int f_loadGeo(const char* filePath) {
 
 
 //////// FILE WRITING ////////
+#ifndef EDITOR
 int f_writeHTMLScreenshot(const char* filePath, const Vec2i_t resolution, const int uiHeight) {
 	//File identifier as HTML content.
 	char* filePrefix = "<!DOCTYPE html>\n";
@@ -414,5 +439,6 @@ void f_getScreenshotFileName(char** filePath, unsigned int* length, const unsign
 	);
 	if (length) {*length = strlen(*filePath);}
 }
+#endif
 //////// FILE WRITING ////////
 

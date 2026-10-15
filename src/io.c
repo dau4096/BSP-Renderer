@@ -126,6 +126,7 @@ int getID(int key) {
 		case KEY_D: {return K_MOVE_RIGHT;}
 
 		case KEY_LEFTSHIFT: {return K_MOVE_FAST;}
+		case KEY_LEFTCTRL: {return K_MOVE_SLOW;}
 		case KEY_SPACE: {return K_MOVE_JUMP;}
 
 		case KEY_LEFT: {return K_TURN_LEFT;}
@@ -207,6 +208,7 @@ static int getID(int vk) {
 		case 'D': {return K_MOVE_RIGHT;}
 
 		case VK_LSHIFT: {return K_MOVE_FAST;}
+		case VK_LCTRL: {return K_MOVE_SLOW;}
 		case VK_SPACE: {return K_MOVE_JUMP;}
 
 		case VK_LEFT:  {return K_TURN_LEFT;}

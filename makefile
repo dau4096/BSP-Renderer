@@ -1,15 +1,25 @@
 CC = gcc
+S = ./src
+E = ./editor
+
 INCLUDE = -I/usr/include -I/usr/local/include
-LIBS = -lm -ldl -ludev -pthread -lxml2
+PRGM_LIBS = -lm -ldl -ludev -pthread -lxml2
+EDITOR_LIBS = -lm -ludev -lxml2
+
 
 SHARED_FLAGS = -DCOLOUR_QUANTISATION -DLIMITED_FREQ -DPLANE_SPAN_TEXTURING
-DEBUG_FLAGS = -g -DDEBUG -DDEBUG_VALUES -DDEBUG_DRAW_ORDER #-DDEBUG_BORDERS #-DSUPPRESS_FRAMEBUFFER_OUTPUT
-RELEASE_FLAGS =  -O3 -ffast-math -march=native
+DEBUG_FLAGS = -g -O0 -DDEBUG -DDEBUG_VALUES -DDEBUG_DRAW_ORDER #-DDEBUG_BORDERS #-DSUPPRESS_FRAMEBUFFER_OUTPUT
+RELEASE_FLAGS = -O3 -ffast-math -march=native
+EDITOR_FLAGS = -g -O0 -DEDITOR #-DSUPPRESS_FRAMEBUFFER_OUTPUT
 
-SOURCES = main.c src/graphics.c src/terminal.c src/physics.c src/io.c src/ui.c src/file.c src/multithread.c
-OBJECTS = $(SOURCES:.c=.o)
-BINFILE = prgm.x86_64
 
+PRGM_SOURCES = ./main.c $(S)/graphics.c $(S)/terminal.c $(S)/physics.c $(S)/io.c $(S)/ui.c $(S)/file.c $(S)/multithread.c
+PRGM_OBJECTS = $(PRGM_SOURCES:.c=.o)
+EDITOR_SOURCES = $(E)/main.c $(E)/terminal.c $(S)/io.c $(S)/file.c $(E)/graphics.c
+EDITOR_OBJECTS = $(EDITOR_SOURCES:.c=.o)
+
+PRGM_BINFILE = ./prgm.x86_64
+EDITOR_BINFILE = ./editor.x86_64
 
 
 .PHONY: all release debug clean
@@ -17,17 +27,24 @@ BINFILE = prgm.x86_64
 all: release
 
 release: CFLAGS = $(SHARED_FLAGS) $(RELEASE_FLAGS)
-release: $(OBJECTS)
-	$(CC) $(OBJECTS) $(LIBS) -o $(BINFILE)
+release: $(PRGM_OBJECTS)
+	$(CC) $(PRGM_OBJECTS) $(PRGM_LIBS) -o $(PRGM_BINFILE)
 
 debug: CFLAGS = $(SHARED_FLAGS) $(DEBUG_FLAGS)
-debug: $(OBJECTS)
-	$(CC) $(OBJECTS) $(LIBS) -o $(BINFILE)
+debug: $(PRGM_OBJECTS)
+	$(CC) $(PRGM_OBJECTS) $(PRGM_LIBS) -o $(PRGM_BINFILE)
+
+editor: CFLAGS = $(EDITOR_FLAGS)
+editor: $(EDITOR_OBJECTS)
+	$(CC) $(EDITOR_OBJECTS) $(EDITOR_LIBS) -o $(EDITOR_BINFILE)
 
 %.o: %.c %.h
 	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
 
 clean:
-	rm -f $(OBJECTS) $(BINFILE)
+	rm -f $(PRGM_OBJECTS) $(PRGM_BINFILE)
+
+editor-clean:
+	rm -f $(EDITOR_OBJECTS) $(EDITOR_BINFILE)
 
 
