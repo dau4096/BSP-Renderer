@@ -1,6 +1,6 @@
 /* graphics.c */
 #include <stdio.h>
-
+#include <stdlib.h>
 
 #include "graphics.h"
 
@@ -38,8 +38,16 @@ Sector_t* g_sectors; //Sectors made of LineDefs.
 void r_drawLineHorizontal(const Vec2i_t start, const Vec2i_t end, const RGB_t colour) {	
 	//Draws a horizontal line on the framebuffer.
 	if (start.y != end.y) {return; /* Can't draw */}
-	RGB_t* fbPTR = t_getFramebufferPTR() + (start.y * framebuffer.resolutionPX.x);
-	for (int x=MAX(0, MIN(start.x, end.x)); x<=MIN(framebuffer.resolutionPX.x-1, MAX(start.x, end.x)); x++) {
+	if (
+		(MAX(start.x, end.x) < 0) ||
+		(MIN(start.x, end.x) >= framebuffer.resolutionPX.x)
+	) {return;}
+
+	int mi = CLAMP(MIN(start.x, end.x), 0, framebuffer.resolutionPX.x - 1);
+	int ma = CLAMP(MAX(start.x, end.x), 0, framebuffer.resolutionPX.x - 1);
+
+	RGB_t* fbPTR = t_getFramebufferPTR() + (start.y * framebuffer.resolutionPX.x) + mi;
+	for (int x=mi; x<=ma; x++) {
 		*(fbPTR++) = colour;
 	}
 }
@@ -47,11 +55,16 @@ void r_drawLineHorizontal(const Vec2i_t start, const Vec2i_t end, const RGB_t co
 void r_drawLineVertical(const Vec2i_t start, const Vec2i_t end, const RGB_t colour) {
 	//Draws a vertical line on the framebuffer.
 	if (start.x != end.x) {return; /* Can't draw */}
+	if (
+		(MAX(start.y, end.y) < 0) ||
+		(MIN(start.y, end.y) >= framebuffer.resolutionPX.y)
+	) {return;}
 
-	int mi = MAX(0, MIN(start.y, end.y));
-	int ma = MIN(framebuffer.resolutionPX.y-1, MIN(start.y, end.y));
 
-	RGB_t* fbPTR = t_getFramebufferPTR() + (mi * framebuffer.resolutionPX.x);
+	int mi = CLAMP(MIN(start.y, end.y), 0, framebuffer.resolutionPX.y - 1);
+	int ma = CLAMP(MAX(start.y, end.y), 0, framebuffer.resolutionPX.y - 1);
+
+	RGB_t* fbPTR = t_getFramebufferPTR() + (mi * framebuffer.resolutionPX.x) + start.x;
 	for (int y=mi; y<=ma; y++) {
 		*fbPTR = colour;
 		fbPTR += framebuffer.resolutionPX.x;
@@ -59,18 +72,31 @@ void r_drawLineVertical(const Vec2i_t start, const Vec2i_t end, const RGB_t colo
 }
 
 void r_drawLineBresenham(const Vec2i_t start, const Vec2i_t end, const RGB_t colour) {
-	//Draws line on the framebuffer using a form of Bresenham's algorithm.
-	int m = 2 * (end.y - start.y);
-	int error = m - (end.x - start.x);
-	for (int x=start.x, y=start.y; x<=end.x; x++) {
+	int x = start.x;
+	int dx = abs(end.x - start.x);
+	int sx = (start.x < end.x) ? 1 : -1;
+
+	int y = start.y;
+	int dy = abs(end.y - start.y);
+	int sy = (start.y < end.y) ? 1 : -1;
+
+	int error = dx - dy;
+	do {
 		t_writePX((Vec2i_t){.x=x, .y=y}, colour);
 
-		error += m;
-		if (error >= 0) { //Reached error limit, inc y.
-			y++;
-			error -= 2 * (end.x - start.x);
+		if (x == end.x && y == end.y) {break;}
+
+		int e2 = 2 * error;
+		if (e2 > -dy) {
+			error -= dy;
+			x += sx;
 		}
-	}
+
+		if (e2 < dx) {
+			error += dx;
+			y += sy;
+		}
+	} while (TRUE);
 }
 
 void r_drawLineAuto(const Vec2i_t start, const Vec2i_t end, const RGB_t colour) {
@@ -91,18 +117,21 @@ void r_drawVertex(const Vec2i_t screenPosition, const RGB_t colour) {
 //////// GRAPHICS ////////
 int r_remapVertexToScreen(const Vec2f_t vertex, Vec2i_t* screenPosition) {
 	//Remaps vertex position to screen position.
-	Vec2f_t geoDelta = v2f_sub(vertex, camera.position); //Delta from the camera (centre screen) to this vertex.
-	float zoom = ZOOM_SCALING_FACTOR * camera.FOV; //Zoom value is stored in the camera's FOV value.
-	Vec2f_t screenspaceDelta = (Vec2f_t){ //From 0 to 1.
-		.x=(geoDelta.x/zoom) + 1.0f / 2.0f,
-		.y=(geoDelta.y/zoom) + 1.0f / 2.0f
+	Vec2f_t geoDelta = v2f_sub(vertex, camera.position);
+
+	float viewWidth = camera.FOV;
+	float aspect = (float)(framebuffer.resolutionPX.x) / (float)(framebuffer.resolutionPX.y);
+	float viewHeight = viewWidth / aspect;
+
+	Vec2f_t screenspaceDelta = {
+		.x = (geoDelta.x / viewWidth) + 0.5f,
+		.y = (geoDelta.y / viewHeight) + 0.5f
 	};
 
-	//We know screen resolution as framebuffer.resolutionPX
-	*screenPosition = (Vec2i_t){ //Actual integer pixel position
-		.x=screenspaceDelta.x * framebuffer.resolutionPX.x,
-		.y=screenspaceDelta.y * framebuffer.resolutionPX.y
-	};
+	screenPosition->x = (int)roundf(screenspaceDelta.x * framebuffer.resolutionPX.x);
+
+	screenPosition->y = (int)roundf(screenspaceDelta.y * framebuffer.resolutionPX.y);
+
 	return !(
 		(screenPosition->x < 0) || (screenPosition->x >= framebuffer.resolutionPX.x) ||
 		(screenPosition->y < 0) || (screenPosition->y >= framebuffer.resolutionPX.y)
@@ -119,13 +148,14 @@ void r_drawLineDef(const LineDef_t* thisLineDef) {
 	Vec2i_t startPX, endPX;
 	int startOnscreen = r_remapVertexToScreen(g_vertices[thisLineDef->vStart], &startPX);
 	int endOnscreen = r_remapVertexToScreen(g_vertices[thisLineDef->vEnd], &endPX);
-	if (!(startOnscreen && endOnscreen)) {return; /* Offscreen. */}
-	r_drawLineBresenham(startPX, endPX, RGB_RED);
+	if (!(startOnscreen || endOnscreen)) {return; /* Offscreen. */}
+	r_drawLineAuto(startPX, endPX, (thisLineDef->backSector == -1) ? RGB_RED : RGB_GREEN);
 	r_drawVertex(startPX, RGB_YELLOW);
 	r_drawVertex(endPX, RGB_YELLOW);
 }
 
 
+#define ORIGIN_SIZE 2
 void r_drawOrigin(void) {
 	//Drawn as a vertex with overlaid cross.
 	Vec2i_t screenPosition;
@@ -134,13 +164,13 @@ void r_drawOrigin(void) {
 
 	r_drawVertex(screenPosition, RGB_WHITE);
 	r_drawLineHorizontal(
-		v2i_add(screenPosition, (Vec2i_t){.x=-5, .y=0}),
-		v2i_add(screenPosition, (Vec2i_t){.x= 5, .y=0}),
+		v2i_add(screenPosition, (Vec2i_t){.x=-ORIGIN_SIZE, .y=0}),
+		v2i_add(screenPosition, (Vec2i_t){.x= ORIGIN_SIZE, .y=0}),
 		RGB_WHITE
 	);
 	r_drawLineVertical(
-		v2i_add(screenPosition, (Vec2i_t){.x=0, .y=-5}),
-		v2i_add(screenPosition, (Vec2i_t){.x=0, .y= 5}),
+		v2i_add(screenPosition, (Vec2i_t){.x=0, .y=-ORIGIN_SIZE}),
+		v2i_add(screenPosition, (Vec2i_t){.x=0, .y= ORIGIN_SIZE}),
 		RGB_WHITE
 	);
 }

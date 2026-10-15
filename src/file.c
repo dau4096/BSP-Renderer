@@ -313,15 +313,7 @@ int f_repositionCamera(const xmlNode* root) {
 	return TRUE; //Success
 
 #else
-	//Unused values.
-	r_camera->Z = 0.0f;
-	r_camera->forward = (Vec2f_t){.x=0.0f, .y=0.0f};
-	r_camera->Zvelocity = 0.0f;
-	r_camera->yaw = 0.0f;
-	r_camera->near = 0.0f;
-	r_camera->far = 0.0f;
-
-	r_camera->FOV = 1.0f; //Re-used as a sort of zoom value.
+	r_camera->FOV = 50.0f; //Re-used as a sort of zoom value.
 
 	if (!cameraNode) {
 		//Couldn't find camera node.

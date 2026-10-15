@@ -19,10 +19,19 @@
 #define EDITOR_MAX_VERTICES 1024
 #define EDITOR_MAX_LINEDEFS 512
 #define EDITOR_MAX_SECTORS 128
-#define MOVEMENT_SPEED_BASE 1000.0f /* In units/second */
-#define ZOOM_SPEED 50.0f
+#define MOVEMENT_SPEED_BASE 1.0f /* In units/second */
+#define ZOOM_SPEED 2.5f
 #define HZ 30.0f
 #define DT (1.0f / HZ)
+
+
+
+#ifdef DEBUG
+#define FB_Y_OFFSET 1
+#else
+#define FB_Y_OFFSET 0
+#endif
+
 
 
 double now(void) {
@@ -60,6 +69,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	Vec2i_t tResChars = t_getTerminalSize();
+	tResChars.y -= FB_Y_OFFSET;
 	t_createFramebuffer(tResChars); //Create framebuffer. (2D pixel data)
 
 
@@ -89,6 +99,7 @@ int main(int argc, char* argv[]) {
 	do { //Frameloop
 		start = now();
 		Vec2i_t newTResChars = t_getTerminalSize();
+		newTResChars.y -= FB_Y_OFFSET;
 		if ((newTResChars.x != tResChars.x) || (newTResChars.y != tResChars.y)) {
 			//Remake framebuffer to fit new res.
 			tResChars = newTResChars;
@@ -103,7 +114,9 @@ int main(int argc, char* argv[]) {
 
 
 		io_handleViewportMovement(dt);
-		printf("%f, %f,    %f\n", r_camera->position.x, r_camera->position.y, r_camera->FOV);
+	#ifdef DEBUG
+		printf("%f, %f,    %f,       %g\n", r_camera->position.x, r_camera->position.y, r_camera->FOV, dt);
+	#endif
 
 
 	#ifndef SUPPRESS_FRAMEBUFFER_OUTPUT
@@ -136,13 +149,13 @@ int main(int argc, char* argv[]) {
 
 
 void io_handleViewportMovement(double dt) {
-	float movSpeed = MOVEMENT_SPEED_BASE * dt * r_camera->FOV;
+	float movSpeed = MOVEMENT_SPEED_BASE * r_camera->FOV * DT;
 	if (keyMapHold[K_MOVE_FORE]) {r_camera->position = v2f_add(r_camera->position, (Vec2f_t){.x=0.0f, .y=movSpeed});}
 	if (keyMapHold[K_MOVE_BACK]) {r_camera->position = v2f_sub(r_camera->position, (Vec2f_t){.x=0.0f, .y=movSpeed});}
 	if (keyMapHold[K_MOVE_LEFT]) {r_camera->position = v2f_sub(r_camera->position, (Vec2f_t){.x=movSpeed, .y=0.0f});}
 	if (keyMapHold[K_MOVE_RIGHT]) {r_camera->position = v2f_add(r_camera->position, (Vec2f_t){.x=movSpeed, .y=0.0f});}
 
-	float zoomSpeed = 1.0f + (ZOOM_SPEED * dt);
+	float zoomSpeed = 1.0f + (ZOOM_SPEED * DT);
 	if (keyMapHold[K_MOVE_FAST]) {r_camera->FOV *= zoomSpeed;}
 	if (keyMapHold[K_MOVE_SLOW]) {r_camera->FOV /= zoomSpeed;}
 }
