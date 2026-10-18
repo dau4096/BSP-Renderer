@@ -4,9 +4,11 @@
 
 
 #include "types.h"
+#include "graphics.h" //For the geometry datasets
 
 
 //////// XML FILE READING ////////
+extern const char* textureNames[MAX_TEXTURES];
 int f_loadGeo(const char* filePath);
 //////// XML FILE READING ////////
 

@@ -117,7 +117,7 @@ static void f_getLineDefsArrayAttr(
 
 
 static unsigned int numAssignedTextures;
-const static char* textureNames[MAX_TEXTURES];
+const char* textureNames[MAX_TEXTURES];
 static unsigned int f_assignTextureIndex(const char* filePath) {
 	if (!filePath) {return fallbackTextureIndex;}
 

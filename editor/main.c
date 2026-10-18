@@ -10,8 +10,9 @@
 #include "../src/maths.h"
 #include "terminal.h"
 #include "../src/io.h"
-#include "../src/file.h"
 #include "graphics.h"
+#include "../src/file.h"
+#include "edit.h"
 
 
 
@@ -19,8 +20,6 @@
 #define EDITOR_MAX_VERTICES 1024
 #define EDITOR_MAX_LINEDEFS 512
 #define EDITOR_MAX_SECTORS 128
-#define MOVEMENT_SPEED_BASE 1.0f /* In units/second */
-#define ZOOM_SPEED 2.5f
 #define HZ 30.0f
 #define DT (1.0f / HZ)
 
@@ -51,8 +50,6 @@ void signalHandler(int sig) {
 }
 
 
-
-void io_handleViewportMovement(double dt);
 
 
 
@@ -87,10 +84,12 @@ int main(int argc, char* argv[]) {
 	if (!loadXMLSuccess) {
 		//Failed to read XML file properly; must be blank. Use placeholder buffers.
 		printf("Creating blank geo with MAX %dv, %dld, %ds\n", EDITOR_MAX_VERTICES, EDITOR_MAX_LINEDEFS, EDITOR_MAX_SECTORS);
-		g_vertices = calloc(EDITOR_MAX_VERTICES, sizeof(Vec2f_t));		g_numVertices = EDITOR_MAX_VERTICES;
-		g_lineDefs = calloc(EDITOR_MAX_VERTICES, sizeof(LineDef_t));	g_numLineDefs = EDITOR_MAX_LINEDEFS;
-		g_sectors  = calloc(EDITOR_MAX_VERTICES, sizeof(Sector_t));		g_numSectors  = EDITOR_MAX_SECTORS;
+		g_vertices = calloc(EDITOR_MAX_VERTICES, sizeof(Vec2f_t));		g_numVertices = 0u;
+		g_lineDefs = calloc(EDITOR_MAX_VERTICES, sizeof(LineDef_t));	g_numLineDefs = 0u;
+		g_sectors  = calloc(EDITOR_MAX_VERTICES, sizeof(Sector_t));		g_numSectors  = 0u;
 	}
+
+	ed_init(xmlFileName);
 
 
 	double start;
@@ -113,7 +112,7 @@ int main(int argc, char* argv[]) {
 		io_pollEvents();
 
 
-		io_handleViewportMovement(dt);
+		io_handleViewportMovement(DT);
 	#ifdef DEBUG
 		printf("%f, %f,    %f,       %g\n", r_camera->position.x, r_camera->position.y, r_camera->FOV, dt);
 	#endif
@@ -124,6 +123,9 @@ int main(int argc, char* argv[]) {
 
 		t_resetCursor();
 		t_drawFramebuffer();
+
+		t_resetCursor();
+		ed_draw(framebuffer.resolutionCHARS);
 	#endif
 
 		dt = now() - start;
@@ -145,17 +147,3 @@ int main(int argc, char* argv[]) {
 	return 1;
 }
 
-
-
-
-void io_handleViewportMovement(double dt) {
-	float movSpeed = MOVEMENT_SPEED_BASE * r_camera->FOV * DT;
-	if (keyMapHold[K_MOVE_FORE]) {r_camera->position = v2f_add(r_camera->position, (Vec2f_t){.x=0.0f, .y=movSpeed});}
-	if (keyMapHold[K_MOVE_BACK]) {r_camera->position = v2f_sub(r_camera->position, (Vec2f_t){.x=0.0f, .y=movSpeed});}
-	if (keyMapHold[K_MOVE_LEFT]) {r_camera->position = v2f_sub(r_camera->position, (Vec2f_t){.x=movSpeed, .y=0.0f});}
-	if (keyMapHold[K_MOVE_RIGHT]) {r_camera->position = v2f_add(r_camera->position, (Vec2f_t){.x=movSpeed, .y=0.0f});}
-
-	float zoomSpeed = 1.0f + (ZOOM_SPEED * DT);
-	if (keyMapHold[K_MOVE_FAST]) {r_camera->FOV *= zoomSpeed;}
-	if (keyMapHold[K_MOVE_SLOW]) {r_camera->FOV /= zoomSpeed;}
-}

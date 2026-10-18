@@ -15,7 +15,7 @@ EDITOR_FLAGS = -g -O0 -DEDITOR #-DSUPPRESS_FRAMEBUFFER_OUTPUT
 
 PRGM_SOURCES = ./main.c $(S)/graphics.c $(S)/terminal.c $(S)/physics.c $(S)/io.c $(S)/ui.c $(S)/file.c $(S)/multithread.c
 PRGM_OBJECTS = $(PRGM_SOURCES:.c=.o)
-EDITOR_SOURCES = $(E)/main.c $(E)/terminal.c $(S)/io.c $(S)/file.c $(E)/graphics.c
+EDITOR_SOURCES = $(E)/main.c $(E)/terminal.c $(S)/io.c $(S)/file.c $(E)/graphics.c $(E)/edit.c $(E)/menu.c
 EDITOR_OBJECTS = $(EDITOR_SOURCES:.c=.o)
 
 PRGM_BINFILE = ./prgm.x86_64

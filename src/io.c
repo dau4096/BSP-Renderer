@@ -131,6 +131,8 @@ int getID(int key) {
 
 		case KEY_LEFT: {return K_TURN_LEFT;}
 		case KEY_RIGHT: {return K_TURN_RIGHT;}
+		case KEY_UP: {return K_NAV_UP;}
+		case KEY_DOWN: {return K_NAV_DOWN;}
 
 		case KEY_Q: {return K_SCREENSHOT;}
 
@@ -213,6 +215,8 @@ static int getID(int vk) {
 
 		case VK_LEFT:  {return K_TURN_LEFT;}
 		case VK_RIGHT: {return K_TURN_RIGHT;}
+		case VK_UP:  {return K_NAV_UP;}
+		case VK_DOWN: {return K_NAV_DOWN;}
 
 		case 'Q': {return K_SCREENSHOT;}
 
