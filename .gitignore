@@ -10,3 +10,5 @@
 gmon.out
 perf.data*
 screenshots/*.html
+xml/tmp.xml
+
