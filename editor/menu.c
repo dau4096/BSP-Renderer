@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include "../src/types.h"
+#include "../src/io.h"
 #include "menu.h"
 
 
@@ -18,7 +19,7 @@ int mn_createNewMenu(char* title, Menu_t* thisMenu) {
 
 	thisMenu->width = MENU_DISPLAY_WIDTH; //TEMPORARY
 	thisMenu->numEntries = 0u;
-	thisMenu->selectedEntry = MENU_MAX_ENTRIES;
+	thisMenu->selectedEntry = 0u;
 	return TRUE; //Success
 }
 
@@ -30,7 +31,7 @@ int mn_deleteMenu(Menu_t* thisMenu) {
 	thisMenu->title[0] = '\0';
 
 	thisMenu->numEntries = 0u;
-	thisMenu->selectedEntry = MENU_MAX_ENTRIES;
+	thisMenu->selectedEntry = 0u;
 	return TRUE; //Success
 }
 
@@ -228,6 +229,9 @@ void printCentered(const char* text, unsigned int width, const char* paddingChar
 
 //////// MENU DRAWING ////////
 #define GET_CURSOR_ANSI_ESCAPE(X, Y, BUF) (sprintf(BUF, "\033[%u;%uH", Y, X))
+int isEditingEntry = FALSE;
+char entryBuffer[MENU_MAX_STRING_LENGTH + 1u];
+char* entryBufferPtr = entryBuffer;
 
 int mn_draw(const Menu_t* thisMenu, const Vec2i_t resolutionChars) {
 	if (!thisMenu || !thisMenu->isValid) {return FALSE; /* Menu doesn't exist or is invalid. */}
@@ -265,14 +269,19 @@ int mn_draw(const Menu_t* thisMenu, const Vec2i_t resolutionChars) {
 			unsigned int titleWidth = thisMenu->width - 3u - MENU_VALUE_DISPLAY_LENGTH;
 			char valueBuffer[MENU_VALUE_DISPLAY_LENGTH + 1u]; valueBuffer[MENU_VALUE_DISPLAY_LENGTH] = '\0';
 			memset(valueBuffer, ' ', MENU_VALUE_DISPLAY_LENGTH);
-			switch (thisEntry->type) {
-				case TYPE_INT: {snprintf(valueBuffer, MENU_VALUE_DISPLAY_LENGTH+1, "%*d", MENU_VALUE_DISPLAY_LENGTH, *(int*)(thisEntry->data)); break;}
-				case TYPE_BOOL: {snprintf(valueBuffer, MENU_VALUE_DISPLAY_LENGTH+1, (*(int*)(thisEntry->data)) ? "YES" : "NO"); break;}
-				case TYPE_CHAR: {snprintf(valueBuffer, MENU_VALUE_DISPLAY_LENGTH+1, "%c", *(char*)(thisEntry->data)); break;}
-				case TYPE_FLOAT: {snprintf(valueBuffer, MENU_VALUE_DISPLAY_LENGTH+1, "%*f", MENU_VALUE_DISPLAY_LENGTH, *(float*)(thisEntry->data)); break;}
-				case TYPE_STR: {snprintf(valueBuffer, MENU_VALUE_DISPLAY_LENGTH+1, "%*s", MENU_VALUE_DISPLAY_LENGTH, (char*)(thisEntry->data)); break;}
-				case TYPE_UINT: {snprintf(valueBuffer, MENU_VALUE_DISPLAY_LENGTH+1, "%*u", MENU_VALUE_DISPLAY_LENGTH, *(unsigned int*)(thisEntry->data)); break;}
-				case TYPE_SEPERATOR: case TYPE_NONE: default: {break;}
+			if (isEditingEntry && (thisMenu->selectedEntry == i)) {
+				//Value should be the currently typed text instead.
+				snprintf(valueBuffer, MENU_VALUE_DISPLAY_LENGTH+1, "%*s", MENU_VALUE_DISPLAY_LENGTH, entryBuffer);
+			} else {
+				switch (thisEntry->type) {
+					case TYPE_INT: {snprintf(valueBuffer, MENU_VALUE_DISPLAY_LENGTH+1, "%*d", MENU_VALUE_DISPLAY_LENGTH, *(int*)(thisEntry->data)); break;}
+					case TYPE_BOOL: {snprintf(valueBuffer, MENU_VALUE_DISPLAY_LENGTH+1, (*(int*)(thisEntry->data)) ? "YES" : "NO"); break;}
+					case TYPE_CHAR: {snprintf(valueBuffer, MENU_VALUE_DISPLAY_LENGTH+1, "%c", *(char*)(thisEntry->data)); break;}
+					case TYPE_FLOAT: {snprintf(valueBuffer, MENU_VALUE_DISPLAY_LENGTH+1, "%*f", MENU_VALUE_DISPLAY_LENGTH, *(float*)(thisEntry->data)); break;}
+					case TYPE_STR: {snprintf(valueBuffer, MENU_VALUE_DISPLAY_LENGTH+1, "%*s", MENU_VALUE_DISPLAY_LENGTH, (char*)(thisEntry->data)); break;}
+					case TYPE_UINT: {snprintf(valueBuffer, MENU_VALUE_DISPLAY_LENGTH+1, "%*u", MENU_VALUE_DISPLAY_LENGTH, *(unsigned int*)(thisEntry->data)); break;}
+					case TYPE_SEPERATOR: case TYPE_NONE: default: {break;}
+				}
 			}
 			printf("┃%s%-*s→%*s%s┃", highlight, titleWidth, thisEntry->title, MENU_VALUE_DISPLAY_LENGTH, valueBuffer, resetColour);
 		}
@@ -290,13 +299,207 @@ int mn_draw(const Menu_t* thisMenu, const Vec2i_t resolutionChars) {
 }
 
 
-int mn_getEntry(const Menu_t* thisMenu, const char* entryName, MenuEntry_t* thisEntry) {
+int mn_getEntry(const Menu_t* thisMenu, const char* entryName, MenuEntry_t** thisEntry) {
 	if (!thisMenu || !thisMenu->isValid) {return FALSE; /* Menu doesn't exist or is invalid. */}
 	
 	unsigned int thisEntryID;
 	if (!mn_getEntryIndex(thisMenu, entryName, &thisEntryID)) {return FALSE;}
 
-	memcpy(thisEntry, thisMenu->entries+thisEntryID, sizeof(MenuEntry_t));
+	*thisEntry = thisMenu->entries + thisEntryID;
 	return TRUE; //Success
 }
+
+
+
+int finishedEditingEntry;
+int mn_editEntry(Menu_t* thisMenu) {
+	finishedEditingEntry = FALSE;
+	if (!thisMenu || !thisMenu->isValid || (thisMenu->selectedEntry == MENU_MAX_ENTRIES)) {return FALSE;}
+
+	MenuEntry_t* selectedEntry = thisMenu->entries + thisMenu->selectedEntry;
+	if ((selectedEntry->type == TYPE_NONE) || (selectedEntry->type == TYPE_SEPERATOR)) {return TRUE; /* Can't edit, but nothing failed. */}
+
+	if (!isEditingEntry) {
+		if (lastPressedChar == '\n') {
+			//Start editing a value
+			isEditingEntry = TRUE;
+			entryBufferPtr = entryBuffer;
+			*entryBufferPtr = '\0';
+		}
+	} else {
+		//Already editing. Check for input and such.
+		if (lastPressedChar == '\n') {
+			//Finished editing.
+			isEditingEntry = FALSE;
+			switch (selectedEntry->type) { //Convert from string rep into [whatever this entry wants]
+				case TYPE_INT: {
+					*(entryBufferPtr++) = '\0';
+					*(int*)(thisMenu->entries[thisMenu->selectedEntry].data) = atoi(entryBuffer);
+					break;
+				}
+				case TYPE_BOOL: {*(int*)(thisMenu->entries[thisMenu->selectedEntry].data) = !(*(char*)(thisMenu->entries[thisMenu->selectedEntry].data)); break;} //Very long line... Invert state.
+				case TYPE_CHAR: {*(char*)(thisMenu->entries[thisMenu->selectedEntry].data) = *entryBufferPtr; break;} //Set to be last pressed char (stored at buffer ptr)
+				case TYPE_FLOAT: {
+					*(entryBufferPtr++) = '\0';
+					*(float*)(thisMenu->entries[thisMenu->selectedEntry].data) = atof(entryBuffer);
+					break;
+				}
+				case TYPE_STR: {
+					*(entryBufferPtr++) = '\0';
+					strcpy(
+						(char*)(thisMenu->entries[thisMenu->selectedEntry].data),
+						entryBuffer
+					);
+					break;
+				}
+				case TYPE_UINT: {
+					*(entryBufferPtr++) = '\0';
+					*(int*)(thisMenu->entries[thisMenu->selectedEntry].data) = strtoul(entryBuffer, NULL, 10);
+					break;
+				}
+				default: {break;}
+			}
+			finishedEditingEntry = TRUE;
+
+		} else if (lastPressedChar == '\b') {
+			//Backspace by one.
+			*entryBufferPtr = '\0';
+			if (entryBufferPtr > entryBuffer) {entryBufferPtr--; /* Don't underflow! */}
+
+		} else if (keyMapPress[K_QUIT]) {
+			//Exit out w/o saving changes.
+			keyMapPress[K_QUIT] = FALSE; //Don't quit prgm!
+			entryBufferPtr = entryBuffer;
+			isEditingEntry = FALSE;
+		} else if (lastPressedChar != '\0') {
+		    //Append typed character if there is space.
+		    if (entryBufferPtr < entryBuffer + MENU_MAX_STRING_LENGTH) {
+		        *entryBufferPtr++ = lastPressedChar;
+		        *entryBufferPtr = '\0';
+		    }
+		}
+	}
+}
+
+
+
+
+//////// VALUE SETTING ////////
+int mn_updateIntEntry(Menu_t* thisMenu, const char* title, int newValue) {
+	if (!thisMenu || !thisMenu->isValid || !title) {return FALSE;}
+
+	MenuEntry_t* thisEntry;
+	if (!mn_getEntry(thisMenu, title, &thisEntry)) {return FALSE;}
+
+	*(int*)(thisEntry->data) = newValue;
+	return TRUE;
+}
+int mn_updateBoolEntry(Menu_t* thisMenu, const char* title, int newValue) {
+	if (!thisMenu || !thisMenu->isValid || !title) {return FALSE;}
+
+	MenuEntry_t* thisEntry;
+	if (!mn_getEntry(thisMenu, title, &thisEntry)) {return FALSE;}
+
+	*(int*)(thisEntry->data) = newValue != FALSE;
+	return TRUE;
+}
+int mn_updateCharEntry(Menu_t* thisMenu, const char* title, char newValue) {
+	if (!thisMenu || !thisMenu->isValid || !title) {return FALSE;}
+
+	MenuEntry_t* thisEntry;
+	if (!mn_getEntry(thisMenu, title, &thisEntry)) {return FALSE;}
+
+	*(char*)(thisEntry->data) = newValue;
+	return TRUE;
+}
+int mn_updateFloatEntry(Menu_t* thisMenu, const char* title, float newValue) {
+	if (!thisMenu || !thisMenu->isValid || !title) {return FALSE;}
+
+	MenuEntry_t* thisEntry;
+	if (!mn_getEntry(thisMenu, title, &thisEntry)) {return FALSE;}
+
+	*(float*)(thisEntry->data) = newValue;
+	return TRUE;
+}
+int mn_updateStringEntry(Menu_t* thisMenu, const char* title, char* newValue) {
+	if (!thisMenu || !thisMenu->isValid || !title) {return FALSE;}
+
+	MenuEntry_t* thisEntry;
+	if (!mn_getEntry(thisMenu, title, &thisEntry)) {return FALSE;}
+
+	strcpy((char*)(thisEntry->data), newValue);
+	return TRUE;
+}
+int mn_updateUIntEntry(Menu_t* thisMenu, const char* title, unsigned int newValue) {
+	if (!thisMenu || !thisMenu->isValid || !title) {return FALSE;}
+
+	MenuEntry_t* thisEntry;
+	if (!mn_getEntry(thisMenu, title, &thisEntry)) {return FALSE;}
+
+	*(unsigned int*)(thisEntry->data) = newValue;
+	return TRUE;
+}
+//////// VALUE SETTING ////////
+
+
+
+
+//////// VALUE RETRIEVAL ////////
+int mn_getInt(Menu_t* thisMenu, char* title, int* ptr) {
+	if (!thisMenu || !thisMenu->isValid || !title || !ptr) {return FALSE;}
+
+	MenuEntry_t* thisEntry;
+	if (!mn_getEntry(thisMenu, title, &thisEntry)) {return FALSE;}
+
+	*ptr = *(int*)(thisEntry->data);
+	return TRUE;
+}
+int mn_getBool(Menu_t* thisMenu, char* title, int* ptr) {
+	if (!thisMenu || !thisMenu->isValid || !title || !ptr) {return FALSE;}
+
+	MenuEntry_t* thisEntry;
+	if (!mn_getEntry(thisMenu, title, &thisEntry)) {return FALSE;}
+
+	*ptr = *(int*)(thisEntry->data) != FALSE;
+	return TRUE;
+}
+int mn_getChar(Menu_t* thisMenu, char* title, char* ptr) {
+	if (!thisMenu || !thisMenu->isValid || !title || !ptr) {return FALSE;}
+
+	MenuEntry_t* thisEntry;
+	if (!mn_getEntry(thisMenu, title, &thisEntry)) {return FALSE;}
+
+	*ptr = *(char*)(thisEntry->data);
+	return TRUE;
+}
+int mn_getFloat(Menu_t* thisMenu, char* title, float* ptr) {
+	if (!thisMenu || !thisMenu->isValid || !title || !ptr) {return FALSE;}
+
+	MenuEntry_t* thisEntry;
+	if (!mn_getEntry(thisMenu, title, &thisEntry)) {return FALSE;}
+
+	*ptr = *(float*)(thisEntry->data);
+	return TRUE;
+}
+int mn_getString(Menu_t* thisMenu, char* title, char** ptr) {
+	if (!thisMenu || !thisMenu->isValid || !title || !ptr) {return FALSE;}
+
+	MenuEntry_t* thisEntry;
+	if (!mn_getEntry(thisMenu, title, &thisEntry)) {return FALSE;}
+
+	*ptr = malloc((MENU_MAX_STRING_LENGTH + 1u) * sizeof(char));
+	strcpy(*ptr, (char*)(thisEntry->data));
+	return TRUE;
+}
+int mn_getUInt(Menu_t* thisMenu, char* title, unsigned int* ptr) {
+	if (!thisMenu || !thisMenu->isValid || !title || !ptr) {return FALSE;}
+
+	MenuEntry_t* thisEntry;
+	if (!mn_getEntry(thisMenu, title, &thisEntry)) {return FALSE;}
+
+	*ptr = *(unsigned int*)(thisEntry->data);
+	return TRUE;
+}
+//////// VALUE RETRIEVAL ////////
+
 //////// MENU DRAWING ////////

@@ -6,7 +6,7 @@
 
 
 //////// TYPES ////////
-#define MENU_MAX_ENTRIES 24u
+#define MENU_MAX_ENTRIES 64u
 #define MENU_MAX_STRING_LENGTH 64u
 #define MENU_DISPLAY_WIDTH 32u
 #define MENU_VALUE_DISPLAY_LENGTH 16u
@@ -42,8 +42,8 @@ typedef struct {
 int mn_createNewMenu(char* title, Menu_t* thisMenu);
 int mn_deleteMenu(Menu_t* thisMenu);
 
-int mn_addIntEntry(Menu_t* thisMenu, char* title, const int defaultValu);
-int mn_addBoolEntry(Menu_t* thisMenu, char* title, const int defaultValu);
+int mn_addIntEntry(Menu_t* thisMenu, char* title, const int defaultValue);
+int mn_addBoolEntry(Menu_t* thisMenu, char* title, const int defaultValue);
 int mn_addCharEntry(Menu_t* thisMenu, char* title, const char defaultValue);
 int mn_addFloatEntry(Menu_t* thisMenu, char* title, const float defaultValue);
 int mn_addStringEntry(Menu_t* thisMenu, char* title, const char* defaultValue);
@@ -57,7 +57,30 @@ int mn_deleteEntry(Menu_t* thisMenu, const char* title);
 
 //////// MENU USAGE ////////
 int mn_draw(const Menu_t* thisMenu, const Vec2i_t resolutionChars);
-int mn_getEntry(const Menu_t* thisMenu, const char* entryName, MenuEntry_t* thisEntry);
+int mn_getEntry(const Menu_t* thisMenu, const char* entryName, MenuEntry_t** thisEntry);
+int mn_editEntry(Menu_t* thisMenu);
+
+
+//////// VALUE SETTING ////////
+int mn_updateIntEntry(Menu_t* thisMenu, const char* title, int newValue);
+int mn_updateBoolEntry(Menu_t* thisMenu, const char* title, int newValue);
+int mn_updateCharEntry(Menu_t* thisMenu, const char* title, char newValue);
+int mn_updateFloatEntry(Menu_t* thisMenu, const char* title, float newValue);
+int mn_updateStringEntry(Menu_t* thisMenu, const char* title, char* newValue);
+int mn_updateUIntEntry(Menu_t* thisMenu, const char* title, unsigned int newValue);
+//////// VALUE SETTING ////////
+
+//////// VALUE RETRIEVAL ////////
+int mn_getInt(Menu_t* thisMenu, char* title, int* ptr);
+int mn_getBool(Menu_t* thisMenu, char* title, int* ptr);
+int mn_getChar(Menu_t* thisMenu, char* title, char* ptr);
+int mn_getFloat(Menu_t* thisMenu, char* title, float* ptr);
+int mn_getString(Menu_t* thisMenu, char* title, char** ptr);
+int mn_getUInt(Menu_t* thisMenu, char* title, unsigned int* ptr);
+//////// VALUE RETRIEVAL ////////
+
+extern int isEditingEntry;
+extern int finishedEditingEntry;
 //////// MENU USAGE ////////
 
 

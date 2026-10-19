@@ -56,7 +56,7 @@ void signalHandler(int sig) {
 int main(int argc, char* argv[]) {
 	signal(SIGINT, signalHandler);
 
-	char xmlFileName[64];
+	char* xmlFileName = malloc(64 * sizeof(char));
 	if (argc > 1) {
 		//Very simple cmdline handling for arguments. Only has XML filepath currently.
 		strcpy(xmlFileName, "xml/");
@@ -125,8 +125,9 @@ int main(int argc, char* argv[]) {
 		t_drawFramebuffer();
 
 		t_resetCursor();
-		ed_draw(framebuffer.resolutionCHARS);
 	#endif
+		ed_update(framebuffer.resolutionCHARS, &xmlFileName);
+
 
 		dt = now() - start;
 		double remaining = DT - dt;

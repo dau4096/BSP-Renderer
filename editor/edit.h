@@ -19,8 +19,7 @@ typedef enum {
 extern EditMode_e currentEditMode;
 
 void ed_init(const char* filePath);
-void ed_draw(const Vec2i_t resolutionChars);
-void ed_handleGeoEdit(void);
+void ed_update(const Vec2i_t resolutionChars, char** filePath);
 //////// GEOMETRY EDITING ////////
 
 

@@ -15,6 +15,7 @@
 
 //////// CAMERA CTRL ////////
 void io_handleViewportMovement(double dt) {
+	if (isEditingEntry) {return;}
 	float movSpeed = MOVEMENT_SPEED_BASE * r_camera->FOV * dt;
 	if (keyMapHold[K_MOVE_FORE]) {r_camera->position = v2f_add(r_camera->position, (Vec2f_t){.x=0.0f, .y=movSpeed});}
 	if (keyMapHold[K_MOVE_BACK]) {r_camera->position = v2f_sub(r_camera->position, (Vec2f_t){.x=0.0f, .y=movSpeed});}
@@ -151,20 +152,69 @@ void ed_init(const char* filePath) {
 }
 
 
-void ed_draw(const Vec2i_t resolutionChars) {
-	if (keyMapPress[K_TURN_LEFT])  {currentEditMode = (currentEditMode-1) % NUM_EDIT_MODES;}
-	if (keyMapPress[K_TURN_RIGHT]) {currentEditMode = (currentEditMode+1) % NUM_EDIT_MODES;}
+#define EQU(X, Y) (strcmp((X), (Y)) == 0u)
+#define ENTRY_IS(Y) (EQU(changedEntry->title, (Y)))
+void ed_update(const Vec2i_t resolutionChars, char** filePath) {
+	if (!isEditingEntry && keyMapPress[K_TURN_LEFT])  {currentEditMode = (currentEditMode-1) % NUM_EDIT_MODES;}
+	if (!isEditingEntry && keyMapPress[K_TURN_RIGHT]) {currentEditMode = (currentEditMode+1) % NUM_EDIT_MODES;}
 
 	Menu_t* currentMenu = editMenus + currentEditMode;
-	if (keyMapPress[K_NAV_UP])   {currentMenu->selectedEntry = (currentMenu->selectedEntry-1) % currentMenu->numEntries;}
-	if (keyMapPress[K_NAV_DOWN]) {currentMenu->selectedEntry = (currentMenu->selectedEntry+1) % currentMenu->numEntries;}
+	mn_editEntry(currentMenu);
+	if (!isEditingEntry && keyMapPress[K_NAV_UP])   {currentMenu->selectedEntry = (currentMenu->selectedEntry-1) % currentMenu->numEntries;}
+	if (!isEditingEntry && keyMapPress[K_NAV_DOWN]) {currentMenu->selectedEntry = (currentMenu->selectedEntry+1) % currentMenu->numEntries;}
 
+#ifndef SUPPRESS_FRAMEBUFFER_OUTPUT
 	mn_draw(currentMenu, resolutionChars);
-}
+#endif
 
+	if (finishedEditingEntry) {
+		//Just finished editing a value.
+		MenuEntry_t* changedEntry = currentMenu->entries + currentMenu->selectedEntry;
+		switch (currentEditMode) {
+			case EDIT_NONE: {
+				//Check changed entry.
+				if (ENTRY_IS("Path")) {
+					//Change filepath to load/save.
+					strcpy(*filePath, (char*)(changedEntry->data));
+				} else if (ENTRY_IS("Save")) {
+					//Save
+					*(int*)(changedEntry->data) = FALSE;
+				} else if (ENTRY_IS("Load")) {
+					//Load
+					*(int*)(changedEntry->data) = FALSE;
+				} else if (ENTRY_IS("Clear")) {
+					//Clear
+					*(int*)(changedEntry->data) = FALSE;
+				}
+				break;
+			}
 
-void ed_handleGeoEdit(void) {
-	//For editing geometry like creating new vertices, etc.
+			case EDIT_VERTICES: {
+				//Check changed entry.
+				if (ENTRY_IS("Vertex ID")) {
+					unsigned int newID = *(unsigned int*)(changedEntry->data);
+					if (newID >= g_numVertices) {break;}
+
+					Vec2f_t* thisVertex = g_vertices + newID;
+					mn_updateFloatEntry(currentMenu, "X", thisVertex->x);
+					mn_updateFloatEntry(currentMenu, "Y", thisVertex->y);
+				} else if (ENTRY_IS("X")) {
+					unsigned int vID;
+					mn_getUInt(currentMenu, "Vertex ID", &vID);
+					Vec2f_t* thisVertex = g_vertices + vID;
+					thisVertex->x = *(float*)(changedEntry->data);
+				} else if (ENTRY_IS("Y")) {
+					unsigned int vID;
+					mn_getUInt(currentMenu, "Vertex ID", &vID);
+					Vec2f_t* thisVertex = g_vertices + vID;
+					thisVertex->y = *(float*)(changedEntry->data);
+				}
+				break;
+			}
+
+			default: {break;}
+		}
+	}
 }
 //////// GEOMETRY EDITING ////////
 

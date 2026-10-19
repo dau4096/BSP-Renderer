@@ -20,6 +20,8 @@ typedef enum {
 } KeyCode_e;
 extern int keyMapHold[NUM_KEYS];
 extern int keyMapPress[NUM_KEYS];
+
+extern char lastPressedChar;
 //////// DATA ////////
 
 

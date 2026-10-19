@@ -13,11 +13,13 @@ int keyMapPress[NUM_KEYS];
 int keyMapHold[NUM_KEYS];
 
 int keyMapPrevious[NUM_KEYS];
+char lastPressedChar;
 
 
 #ifndef _WIN32 //Linux only;
 
 #include <linux/input.h>
+#include <linux/input-event-codes.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -147,11 +149,65 @@ int getID(int key) {
 }
 
 
+char getKeyChar(int key) {
+    switch (key) {
+        case KEY_A: {return 'a';}
+        case KEY_B: {return 'b';}
+        case KEY_C: {return 'c';}
+        case KEY_D: {return 'd';}
+        case KEY_E: {return 'e';}
+        case KEY_F: {return 'f';}
+        case KEY_G: {return 'g';}
+        case KEY_H: {return 'h';}
+        case KEY_I: {return 'i';}
+        case KEY_J: {return 'j';}
+        case KEY_K: {return 'k';}
+        case KEY_L: {return 'l';}
+        case KEY_M: {return 'm';}
+        case KEY_N: {return 'n';}
+        case KEY_O: {return 'o';}
+        case KEY_P: {return 'p';}
+        case KEY_Q: {return 'q';}
+        case KEY_R: {return 'r';}
+        case KEY_S: {return 's';}
+        case KEY_T: {return 't';}
+        case KEY_U: {return 'u';}
+        case KEY_V: {return 'v';}
+        case KEY_W: {return 'w';}
+        case KEY_X: {return 'x';}
+        case KEY_Y: {return 'y';}
+        case KEY_Z: {return 'z';}
+
+        case KEY_COMMA: {return ',';}
+        case KEY_DOT:   {return '.';}
+        case KEY_SLASH: {return '/';}
+        case KEY_MINUS: {return '-';}
+
+        case KEY_0: {return '0';}
+        case KEY_1: {return '1';}
+        case KEY_2: {return '2';}
+        case KEY_3: {return '3';}
+        case KEY_4: {return '4';}
+        case KEY_5: {return '5';}
+        case KEY_6: {return '6';}
+        case KEY_7: {return '7';}
+        case KEY_8: {return '8';}
+        case KEY_9: {return '9';}
+
+        case KEY_SPACE:     {return ' ';}
+        case KEY_BACKSPACE: {return '\b';}
+        case KEY_ENTER:     {return '\n';}
+
+        default: {return '\0';}
+    }
+}
+
 
 #define MAX_EVENTS_PER_FRAME 64
 void io_pollEvents(void) {
 	memcpy(keyMapPrevious, keyMapHold, sizeof(keyMapHold));
 	memset(keyMapPress, 0, sizeof(keyMapPress));
+	lastPressedChar = '\0';
 
 	for (unsigned int fdID=0u; fdID<numFDs; fdID++) {
 		struct input_event ev;
@@ -165,6 +221,7 @@ void io_pollEvents(void) {
 
 				if (ev.type == EV_KEY) {
 					int ID = getID(ev.code);
+					if (ev.value == 1) {lastPressedChar = getKeyChar(ev.code);}
 					if (ID < NUM_KEYS) {
 						//Update keymap
 						keyMapHold[ID] = (ev.value != 0);
@@ -200,23 +257,23 @@ void io_pollEvents(void) {
 
 #include <windows.h>
 
-static int getID(int vk) {
-	switch (vk) {
-		case VK_ESCAPE: {return K_QUIT;}
+static int getID(int key) {
+	switch (key) {
+		case key_ESCAPE: {return K_QUIT;}
 
 		case 'W': {return K_MOVE_FORE;}
 		case 'S': {return K_MOVE_BACK;}
 		case 'A': {return K_MOVE_LEFT;}
 		case 'D': {return K_MOVE_RIGHT;}
 
-		case VK_LSHIFT: {return K_MOVE_FAST;}
-		case VK_LCTRL: {return K_MOVE_SLOW;}
-		case VK_SPACE: {return K_MOVE_JUMP;}
+		case key_LSHIFT: {return K_MOVE_FAST;}
+		case key_LCTRL: {return K_MOVE_SLOW;}
+		case key_SPACE: {return K_MOVE_JUMP;}
 
-		case VK_LEFT:  {return K_TURN_LEFT;}
-		case VK_RIGHT: {return K_TURN_RIGHT;}
-		case VK_UP:  {return K_NAV_UP;}
-		case VK_DOWN: {return K_NAV_DOWN;}
+		case key_LEFT:  {return K_TURN_LEFT;}
+		case key_RIGHT: {return K_TURN_RIGHT;}
+		case key_UP:  {return K_NAV_UP;}
+		case key_DOWN: {return K_NAV_DOWN;}
 
 		case 'Q': {return K_SCREENSHOT;}
 
@@ -224,15 +281,38 @@ static int getID(int vk) {
 	}
 }
 
+
+char getKeyChar(int key) {
+    if ((key >= 'A') && (key <= 'Z')) {
+        return (char)(key - 'A' + 'a');
+    }
+
+    if ((key >= '0') && (key <= '9')) {
+        return (char)key;
+    }
+
+	switch (key) {
+		case key_SPACE:  {return ' ';}
+		case key_BACK:   {return '\b';}
+		case key_RETURN: {return '\n';}
+		case key_TAB:    {return '\t';}
+	}
+
+    return '\0';
+}
+
+
 void io_init(void) {/* Nothing to do. */}
 void io_quit(void) {/* Nothing to do. */}
 
 void io_pollEvents(void) {
-	for (int vk=0; vk<256; vk++) {
-		int ID = getID(vk);
+	lastPressedChar = '\0';
+	for (int key=0; key<256; key++) {
+		int ID = getID(key);
 		if (ID >= NUM_KEYS) {continue;}
 
-		SHORT state = GetAsyncKeyState(vk);
+		SHORT state = GetAsyncKeyState(key);
+		lastPressedChar = getKeyChar(key);
 
 		//High bit → key currently pressed
 		keyMapPrevious[ID] = keyMapHold[ID];
