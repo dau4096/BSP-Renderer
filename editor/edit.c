@@ -185,9 +185,9 @@ void ed_init(char** fpPtr) {
 
 	Menu_t* verticesMenu = editMenus + EDIT_VERTICES;
 	mn_createNewMenu("Vertices", verticesMenu);
-	mn_addCallbackEntry(verticesMenu, "New", ed_addNewVertexCBK);
 	mn_addSeperator(verticesMenu, "");
 	mn_addUIntEntry(verticesMenu, "Vertex ID", 0u);
+	mn_addCallbackEntry(verticesMenu, "Add", ed_addNewVertexCBK);
 	mn_addSeperator(verticesMenu, "Position");
 
 	float X, Y;
@@ -204,9 +204,9 @@ void ed_init(char** fpPtr) {
 
 	Menu_t* linedefsMenu = editMenus + EDIT_LINEDEFS;
 	mn_createNewMenu("LineDefs", linedefsMenu);
-	mn_addCallbackEntry(linedefsMenu, "New", ed_addNewLineDefCBK);
 	mn_addSeperator(linedefsMenu, "");
 	mn_addUIntEntry(linedefsMenu, "LineDef ID", 0u);
+	mn_addCallbackEntry(linedefsMenu, "Add", ed_addNewLineDefCBK);
 	mn_addSeperator(linedefsMenu, "Geometry");
 	if (g_numLineDefs > 0u) {
 		mn_addUIntEntry(linedefsMenu, "Start vID", g_lineDefs->vStart);
@@ -232,9 +232,9 @@ void ed_init(char** fpPtr) {
 
 	Menu_t* sectorsMenu = editMenus + EDIT_SECTORS;
 	mn_createNewMenu("Sectors", sectorsMenu);
-	mn_addCallbackEntry(sectorsMenu, "New", ed_addNewSectorCBK);
 	mn_addSeperator(sectorsMenu, "");
 	mn_addUIntEntry(sectorsMenu, "Sector ID", 0u);
+	mn_addCallbackEntry(sectorsMenu, "Add", ed_addNewSectorCBK);
 	mn_addSeperator(sectorsMenu, "Geometry");
 	if (g_numSectors > 0u) {
 		mn_addUIntEntry(sectorsMenu, "Light Level", g_sectors->lightLevel);
@@ -293,12 +293,18 @@ void ed_init(char** fpPtr) {
 #define EQU(X, Y) (strcmp((X), (Y)) == 0u)
 #define ENTRY_IS(Y) (EQU(changedEntry->title, (Y)))
 int ed_update(const Vec2i_t resolutionChars) {
-	if (!isEditingEntry && keyMapPress[K_TURN_LEFT])  {currentEditMode = (currentEditMode-1) % NUM_EDIT_MODES;}
+	if (!isEditingEntry && keyMapPress[K_TURN_LEFT])  {
+		if (currentEditMode > 0) {currentEditMode--;}
+		else {currentEditMode = NUM_EDIT_MODES;}
+	}
 	if (!isEditingEntry && keyMapPress[K_TURN_RIGHT]) {currentEditMode = (currentEditMode+1) % NUM_EDIT_MODES;}
 
 	Menu_t* currentMenu = editMenus + currentEditMode;
 	mn_editEntry(currentMenu);
-	if (!isEditingEntry && keyMapPress[K_NAV_UP])   {currentMenu->selectedEntry = (currentMenu->selectedEntry-1) % currentMenu->numEntries;}
+	if (!isEditingEntry && keyMapPress[K_NAV_UP]) {
+		if (currentMenu->selectedEntry > 0) {currentMenu->selectedEntry--;}
+		else {currentMenu->selectedEntry = currentMenu->numEntries - 1u;}
+	}
 	if (!isEditingEntry && keyMapPress[K_NAV_DOWN]) {currentMenu->selectedEntry = (currentMenu->selectedEntry+1) % currentMenu->numEntries;}
 
 #ifndef SUPPRESS_FRAMEBUFFER_OUTPUT
