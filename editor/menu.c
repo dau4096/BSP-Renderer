@@ -40,7 +40,7 @@ int mn_deleteMenu(Menu_t* thisMenu) {
 
 int mn_addIntEntry(Menu_t* thisMenu, char* title, const int defaultValue) {
 	if (!thisMenu || !thisMenu->isValid) {return FALSE; /* Menu doesn't exist or is invalid. */}
-	if (thisMenu->numEntries == MENU_MAX_ENTRIES) {return FALSE; /* Can't add another. */}
+	if (thisMenu->numEntries >= MENU_MAX_ENTRIES) {return FALSE; /* Can't add another. */}
 
 	thisMenu->entries[thisMenu->numEntries] = (MenuEntry_t){
 		.title=strdup(title), .isValid=TRUE,
@@ -57,7 +57,7 @@ int mn_addIntEntry(Menu_t* thisMenu, char* title, const int defaultValue) {
 
 int mn_addBoolEntry(Menu_t* thisMenu, char* title, const int defaultValue) {
 	if (!thisMenu || !thisMenu->isValid) {return FALSE; /* Menu doesn't exist or is invalid. */}
-	if (thisMenu->numEntries == MENU_MAX_ENTRIES) {return FALSE; /* Can't add another. */}
+	if (thisMenu->numEntries >= MENU_MAX_ENTRIES) {return FALSE; /* Can't add another. */}
 
 	thisMenu->entries[thisMenu->numEntries] = (MenuEntry_t){
 		.title=strdup(title), .isValid=TRUE,
@@ -74,7 +74,7 @@ int mn_addBoolEntry(Menu_t* thisMenu, char* title, const int defaultValue) {
 
 int mn_addCharEntry(Menu_t* thisMenu, char* title, const char defaultValue) {
 	if (!thisMenu || !thisMenu->isValid) {return FALSE; /* Menu doesn't exist or is invalid. */}
-	if (thisMenu->numEntries == MENU_MAX_ENTRIES) {return FALSE; /* Can't add another. */}
+	if (thisMenu->numEntries >= MENU_MAX_ENTRIES) {return FALSE; /* Can't add another. */}
 
 	thisMenu->entries[thisMenu->numEntries] = (MenuEntry_t){
 		.title=strdup(title), .isValid=TRUE,
@@ -91,7 +91,7 @@ int mn_addCharEntry(Menu_t* thisMenu, char* title, const char defaultValue) {
 
 int mn_addFloatEntry(Menu_t* thisMenu, char* title, const float defaultValue) {
 	if (!thisMenu || !thisMenu->isValid) {return FALSE; /* Menu doesn't exist or is invalid. */}
-	if (thisMenu->numEntries == MENU_MAX_ENTRIES) {return FALSE; /* Can't add another. */}
+	if (thisMenu->numEntries >= MENU_MAX_ENTRIES) {return FALSE; /* Can't add another. */}
 
 	thisMenu->entries[thisMenu->numEntries] = (MenuEntry_t){
 		.title=strdup(title), .isValid=TRUE,
@@ -128,7 +128,7 @@ int mn_addStringEntry(Menu_t* thisMenu, char* title, const char* defaultValue) {
 
 int mn_addUIntEntry(Menu_t* thisMenu, char* title, const unsigned int defaultValue) {
 	if (!thisMenu || !thisMenu->isValid) {return FALSE; /* Menu doesn't exist or is invalid. */}
-	if (thisMenu->numEntries == MENU_MAX_ENTRIES) {return FALSE; /* Can't add another. */}
+	if (thisMenu->numEntries >= MENU_MAX_ENTRIES) {return FALSE; /* Can't add another. */}
 
 	thisMenu->entries[thisMenu->numEntries] = (MenuEntry_t){
 		.title=strdup(title), .isValid=TRUE,
@@ -146,7 +146,7 @@ int mn_addUIntEntry(Menu_t* thisMenu, char* title, const unsigned int defaultVal
 int mn_addSeperator(Menu_t* thisMenu, char* title) {
 	//Like a title in the middle of a menu.
 	if (!thisMenu || !thisMenu->isValid) {return FALSE; /* Menu doesn't exist or is invalid. */}
-	if (thisMenu->numEntries == MENU_MAX_ENTRIES) {return FALSE; /* Can't add another. */}
+	if (thisMenu->numEntries >= MENU_MAX_ENTRIES) {return FALSE; /* Can't add another. */}
 
 	thisMenu->entries[thisMenu->numEntries] = (MenuEntry_t){
 		.title=strdup(title), .isValid=TRUE,
@@ -163,7 +163,7 @@ int mn_addSeperator(Menu_t* thisMenu, char* title) {
 int mn_addCallbackEntry(Menu_t* thisMenu, char* title, int (*func)(void)) {
 	//Calls some callback func when pressed..
 	if (!thisMenu || !thisMenu->isValid) {return FALSE; /* Menu doesn't exist or is invalid. */}
-	if (thisMenu->numEntries == MENU_MAX_ENTRIES) {return FALSE; /* Can't add another. */}
+	if (thisMenu->numEntries >= MENU_MAX_ENTRIES) {return FALSE; /* Can't add another. */}
 
 	thisMenu->entries[thisMenu->numEntries] = (MenuEntry_t){
 		.title=strdup(title), .isValid=TRUE,
@@ -229,7 +229,7 @@ int mn_deleteEntry(Menu_t* thisMenu, const char* title) {
 
 
 
-void printCentered(const char* text, unsigned int width, const char* paddingChar, int inclEdges) {
+void printCenteredWithBox(const char* text, unsigned int width, const char* paddingChar, const char* leftBoxSide, const char* rightBoxSide) {
 	unsigned int len = (unsigned int)(strlen(text));
 
 	if (len >= width) {
@@ -237,16 +237,24 @@ void printCentered(const char* text, unsigned int width, const char* paddingChar
 		return;
 	}
 
+	int leftSide = (leftBoxSide[0] != '\0') && (strlen(text) > 0u);
+	int rightSide = (rightBoxSide[0] != '\0') && (strlen(text) > 0u);
+
 	//if (inclEdges) {width -= 2u;}
 	unsigned int leftPadding = (width - len) / 2u;
 	unsigned int rightPadding = width - len - leftPadding;
-	if (inclEdges) {leftPadding--; rightPadding--;}
+	if (leftSide) {leftPadding--;}
+	if (rightSide) {rightPadding--;}
 
 	for (unsigned int i=0u; i<leftPadding; i++) {printf("%s", paddingChar);}
-	if (inclEdges) {printf("┫");}
+	if (leftSide) {printf("%s", leftBoxSide);}
 	printf("%s", text);
-	if (inclEdges) {printf("┣");}
+	if (rightSide) {printf("%s", rightBoxSide);}
 	for (unsigned int i=0u; i<rightPadding; i++) {printf("%s", paddingChar);}
+}
+
+void printCentered(const char* text, unsigned int width, const char* paddingChar) {
+	printCenteredWithBox(text, width, paddingChar, "", "");
 }
 
 
@@ -274,7 +282,7 @@ int mn_draw(const Menu_t* thisMenu, const Vec2i_t resolutionChars) {
 	//Draw title
 	GET_CURSOR_ANSI_ESCAPE(startColumn, currentRow++, resetCursor);
 	printf("%s┃", resetCursor);
-	printCentered(thisMenu->title, thisMenu->width-2u, " ", FALSE);
+	printCentered(thisMenu->title, thisMenu->width-2u, " ");
 	printf("┃");
 
 	//Draw each entry
@@ -288,11 +296,11 @@ int mn_draw(const Menu_t* thisMenu, const Vec2i_t resolutionChars) {
 
 		if (thisEntry->type == TYPE_SEPERATOR) {
 			printf("%s┣%s", resetCursor, highlight);
-			printCentered(thisEntry->title, thisMenu->width-2u, "━", strlen(thisEntry->title) > 0u);
+			printCenteredWithBox(thisEntry->title, thisMenu->width-2u, "━", "┫", "┣");
 			printf("%s┫", resetColour);
 		} else if (thisEntry->type == TYPE_CALLBACK) {
 			printf("%s┃%s", resetCursor, highlight);
-			printCentered(thisEntry->title, thisMenu->width-2u, " ", FALSE);
+			printCenteredWithBox(thisEntry->title, thisMenu->width-2u, " ", "<", ">");
 			printf("%s┃", resetColour);
 		} else {
 			unsigned int titleWidth = thisMenu->width - 3u - MENU_VALUE_DISPLAY_LENGTH;
