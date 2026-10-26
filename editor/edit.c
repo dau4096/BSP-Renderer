@@ -154,14 +154,52 @@ int ed_addNewSectorCBK(void) {
 	g_sectors[g_numSectors] = (Sector_t){
 		.floorHeight=0.0f, .floorTexture=0u, .floorColour=RGB_BLACK,
 		.ceilingHeight=0.0f, .ceilingTexture=0u, .ceilingColour=RGB_BLACK,
-		.flags=0b0000'0000,
-		.lineDefs=NULL, .numLineDefs=0u,
-		.lightLevel=0xFF
+		.flags=0b0000'0000, .lineDefs=NULL, .numLineDefs=0u,
+		.lightLevel=0xFF, .isValid = TRUE
 	};
 
 	Menu_t* currentMenu = editMenus + currentEditMode;
 	mn_updateUIntEntry(currentMenu, "Sector ID", g_numSectors);
 	ed_updateToSectorID(currentMenu, g_numSectors++);
+	return TRUE;
+}
+
+
+
+
+
+
+int ed_deleteVertexCBK(void) {
+	if (g_numVertices == 0u) {return FALSE;}
+	Menu_t* currentMenu = editMenus + currentEditMode;
+	unsigned int ID;
+	mn_getUInt(currentMenu, "Vertex ID", &ID);
+	g_vertices[ID].x = 0.0f;
+	g_vertices[ID].y = 0.0f;
+	if (ID > 0u) {ed_updateToVertexID(currentMenu, ID-1);}
+	else {ed_updateToVertexID(currentMenu, ID+1);}
+	return TRUE;
+}
+
+int ed_deleteLineDefCBK(void) {
+	if (g_numLineDefs == 0u) {return FALSE;}
+	Menu_t* currentMenu = editMenus + currentEditMode;
+	unsigned int ID;
+	mn_getUInt(currentMenu, "LineDef ID", &ID);
+	g_lineDefs[ID].isValid = FALSE;
+	if (ID > 0u) {ed_updateToLineDefID(currentMenu, ID-1);}
+	else {ed_updateToLineDefID(currentMenu, ID+1);}
+	return TRUE;
+}
+
+int ed_deleteSectorCBK(void) {
+	if (g_numSectors == 0u) {return FALSE;}
+	Menu_t* currentMenu = editMenus + currentEditMode;
+	unsigned int ID;
+	mn_getUInt(currentMenu, "Sector ID", &ID);
+	g_sectors[ID].isValid = FALSE;
+	if (ID > 0u) {ed_updateToSectorID(currentMenu, ID-1);}
+	else {ed_updateToSectorID(currentMenu, ID+1);}
 	return TRUE;
 }
 
@@ -188,6 +226,7 @@ void ed_init(char** fpPtr) {
 	mn_addSeperator(verticesMenu, "");
 	mn_addUIntEntry(verticesMenu, "Vertex ID", 0u);
 	mn_addCallbackEntry(verticesMenu, "Add", ed_addNewVertexCBK);
+	mn_addCallbackEntry(verticesMenu, "Delete", ed_deleteVertexCBK);
 	mn_addSeperator(verticesMenu, "Position");
 
 	float X, Y;
@@ -207,6 +246,7 @@ void ed_init(char** fpPtr) {
 	mn_addSeperator(linedefsMenu, "");
 	mn_addUIntEntry(linedefsMenu, "LineDef ID", 0u);
 	mn_addCallbackEntry(linedefsMenu, "Add", ed_addNewLineDefCBK);
+	mn_addCallbackEntry(linedefsMenu, "Delete", ed_deleteLineDefCBK);
 	mn_addSeperator(linedefsMenu, "Geometry");
 	if (g_numLineDefs > 0u) {
 		mn_addUIntEntry(linedefsMenu, "Start vID", g_lineDefs->vStart);
@@ -235,6 +275,7 @@ void ed_init(char** fpPtr) {
 	mn_addSeperator(sectorsMenu, "");
 	mn_addUIntEntry(sectorsMenu, "Sector ID", 0u);
 	mn_addCallbackEntry(sectorsMenu, "Add", ed_addNewSectorCBK);
+	mn_addCallbackEntry(sectorsMenu, "Delete", ed_deleteSectorCBK);
 	mn_addSeperator(sectorsMenu, "Geometry");
 	if (g_numSectors > 0u) {
 		mn_addUIntEntry(sectorsMenu, "Light Level", g_sectors->lightLevel);
@@ -340,7 +381,6 @@ int ed_update(const Vec2i_t resolutionChars) {
 					if (newID >= g_numVertices) {
 						newID = g_numVertices-1u;
 						mn_updateUIntEntry(currentMenu, "Vertex ID", newID);
-						break;
 					}
 					ed_updateToVertexID(currentMenu, newID);
 				
@@ -363,7 +403,7 @@ int ed_update(const Vec2i_t resolutionChars) {
 				//Check changed entry.
 				if (ENTRY_IS("LineDef ID")) {
 					unsigned int newID = *(unsigned int*)(changedEntry->data);
-					if (newID >= g_numLineDefs) {
+					if ((newID >= g_numLineDefs) || (!g_lineDefs[newID].isValid)) {
 						newID = g_numLineDefs-1u;
 						mn_updateUIntEntry(currentMenu, "LineDef ID", newID);
 					}
@@ -438,10 +478,9 @@ int ed_update(const Vec2i_t resolutionChars) {
 				//Check changed entry.
 				if (ENTRY_IS("Sector ID")) {
 					unsigned int newID = *(unsigned int*)(changedEntry->data);
-					if (newID >= g_numSectors) {
+					if ((newID >= g_numSectors) || (!g_sectors[newID].isValid)) {
 						newID = g_numSectors-1u;
 						mn_updateUIntEntry(currentMenu, "Sector ID", newID);
-						break;
 					}
 					ed_updateToSectorID(currentMenu, newID);
 

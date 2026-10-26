@@ -54,6 +54,7 @@ typedef struct {
 	unsigned int* lineDefs;    //Array of IDs to LineDef_t[] array (Like 3D model indices)
 	unsigned int numLineDefs; //Length of ID array [^^].
 	uint8_t lightLevel; //Brightness of the sector, 0-255
+	int isValid;
 } Sector_t;
 
 
