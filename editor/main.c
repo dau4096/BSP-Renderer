@@ -17,9 +17,6 @@
 
 
 
-#define EDITOR_MAX_VERTICES 1024
-#define EDITOR_MAX_LINEDEFS 512
-#define EDITOR_MAX_SECTORS 128
 #define HZ 30.0f
 #define DT (1.0f / HZ)
 
@@ -85,11 +82,11 @@ int main(int argc, char* argv[]) {
 		//Failed to read XML file properly; must be blank. Use placeholder buffers.
 		printf("Creating blank geo with MAX %dv, %dld, %ds\n", EDITOR_MAX_VERTICES, EDITOR_MAX_LINEDEFS, EDITOR_MAX_SECTORS);
 		g_vertices = calloc(EDITOR_MAX_VERTICES, sizeof(Vec2f_t));		g_numVertices = 0u;
-		g_lineDefs = calloc(EDITOR_MAX_VERTICES, sizeof(LineDef_t));	g_numLineDefs = 0u;
-		g_sectors  = calloc(EDITOR_MAX_VERTICES, sizeof(Sector_t));		g_numSectors  = 0u;
+		g_lineDefs = calloc(EDITOR_MAX_LINEDEFS, sizeof(LineDef_t));	g_numLineDefs = 0u;
+		g_sectors  = calloc(EDITOR_MAX_SECTORS, sizeof(Sector_t));		g_numSectors  = 0u;
 	}
 
-	ed_init(xmlFileName);
+	ed_init(&xmlFileName);
 
 
 	double start;
@@ -126,7 +123,7 @@ int main(int argc, char* argv[]) {
 
 		t_resetCursor();
 	#endif
-		ed_update(framebuffer.resolutionCHARS, &xmlFileName);
+		if (!ed_update(framebuffer.resolutionCHARS)) {run = FALSE;}
 
 
 		dt = now() - start;

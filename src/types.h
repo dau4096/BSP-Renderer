@@ -42,7 +42,7 @@ typedef struct {
 	int frontSector;        //Sector ID this LineDef_t belongs to
 	int backSector;        //-1 if solid wall, else index of neighbouring sector.
 	unsigned int texture; //Texture to draw.
-						 //
+						 //Continue nice comment pattern
 	int isValid;        //Was it created correctly?
 } LineDef_t;
 

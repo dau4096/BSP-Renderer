@@ -386,7 +386,13 @@ int f_loadGeo(const char* filePath) {
 
 
 //////// FILE WRITING ////////
-#ifndef EDITOR
+
+#ifdef EDITOR
+int f_saveGeo(const char* filePath) {
+	return TRUE; //TBA
+}
+
+#else
 int f_writeHTMLScreenshot(const char* filePath, const Vec2i_t resolution, const int uiHeight) {
 	//File identifier as HTML content.
 	char* filePrefix = "<!DOCTYPE html>\n";

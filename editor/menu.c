@@ -45,6 +45,7 @@ int mn_addIntEntry(Menu_t* thisMenu, char* title, const int defaultValue) {
 	thisMenu->entries[thisMenu->numEntries] = (MenuEntry_t){
 		.title=strdup(title), .isValid=TRUE,
 		.data=(void*)(malloc(sizeof(int))), //Allocate space for this entry's value.
+		.callback=NULL,
 		.type=TYPE_INT
 	};
 	*(int*)(thisMenu->entries[thisMenu->numEntries].data) = defaultValue;
@@ -61,6 +62,7 @@ int mn_addBoolEntry(Menu_t* thisMenu, char* title, const int defaultValue) {
 	thisMenu->entries[thisMenu->numEntries] = (MenuEntry_t){
 		.title=strdup(title), .isValid=TRUE,
 		.data=(void*)(malloc(sizeof(int))), //Allocate space for this entry's value.
+		.callback=NULL,
 		.type=TYPE_BOOL
 	};
 	*(int*)(thisMenu->entries[thisMenu->numEntries].data) = defaultValue;
@@ -77,6 +79,7 @@ int mn_addCharEntry(Menu_t* thisMenu, char* title, const char defaultValue) {
 	thisMenu->entries[thisMenu->numEntries] = (MenuEntry_t){
 		.title=strdup(title), .isValid=TRUE,
 		.data=(void*)(malloc(sizeof(char))), //Allocate space for this entry's value.
+		.callback=NULL,
 		.type=TYPE_CHAR
 	};
 	*(char*)(thisMenu->entries[thisMenu->numEntries].data) = defaultValue;
@@ -93,6 +96,7 @@ int mn_addFloatEntry(Menu_t* thisMenu, char* title, const float defaultValue) {
 	thisMenu->entries[thisMenu->numEntries] = (MenuEntry_t){
 		.title=strdup(title), .isValid=TRUE,
 		.data=(void*)(malloc(sizeof(float))), //Allocate space for this entry's value.
+		.callback=NULL,
 		.type=TYPE_FLOAT
 	};
 	*(float*)(thisMenu->entries[thisMenu->numEntries].data) = defaultValue;
@@ -112,8 +116,9 @@ int mn_addStringEntry(Menu_t* thisMenu, char* title, const char* defaultValue) {
 
     snprintf(data, MENU_MAX_STRING_LENGTH, "%s", defaultValue);
     thisMenu->entries[thisMenu->numEntries] = (MenuEntry_t){
-        .title = title, .isValid = TRUE,
-        .data = data, .type = TYPE_STR
+        .title=title, .isValid=TRUE,
+        .data=data, .callback=NULL,
+        .type=TYPE_STR
     };
 
     thisMenu->numEntries++;
@@ -128,6 +133,7 @@ int mn_addUIntEntry(Menu_t* thisMenu, char* title, const unsigned int defaultVal
 	thisMenu->entries[thisMenu->numEntries] = (MenuEntry_t){
 		.title=strdup(title), .isValid=TRUE,
 		.data=(void*)(malloc(sizeof(unsigned int))), //Allocate space for this entry's value.
+		.callback=NULL,
 		.type=TYPE_UINT
 	};
 	*(unsigned int*)(thisMenu->entries[thisMenu->numEntries].data) = defaultValue;
@@ -145,12 +151,32 @@ int mn_addSeperator(Menu_t* thisMenu, char* title) {
 	thisMenu->entries[thisMenu->numEntries] = (MenuEntry_t){
 		.title=strdup(title), .isValid=TRUE,
 		.data=NULL, //No need to allocate space.
+		.callback=NULL,
 		.type=TYPE_SEPERATOR
 	};
 	thisMenu->numEntries++;
 
 	return TRUE; //Success
 }
+
+
+int mn_addCallbackEntry(Menu_t* thisMenu, char* title, int (*func)(void)) {
+	//Calls some callback func when pressed..
+	if (!thisMenu || !thisMenu->isValid) {return FALSE; /* Menu doesn't exist or is invalid. */}
+	if (thisMenu->numEntries == MENU_MAX_ENTRIES) {return FALSE; /* Can't add another. */}
+
+	thisMenu->entries[thisMenu->numEntries] = (MenuEntry_t){
+		.title=strdup(title), .isValid=TRUE,
+		.data=NULL, //No need to allocate space.
+		.callback=func, //Stores func to call. Takes no args, returns success [TRUE/FALSE]
+		.type=TYPE_CALLBACK
+	};
+	thisMenu->numEntries++;
+
+	return TRUE; //Success
+
+}
+
 
 
 
@@ -175,8 +201,8 @@ int mn_deleteEntry(Menu_t* thisMenu, const char* title) {
 	unsigned int thisEntryID;
 	if (!mn_getEntryIndex(thisMenu, title, &thisEntryID)) {return FALSE;}
 
-	if (thisMenu->selectedEntry == thisEntryID) {
-		thisMenu->selectedEntry = (thisMenu->selectedEntry > 0u) ? thisMenu->selectedEntry-- : MENU_MAX_ENTRIES;
+	if (thisMenu->selectedEntry >= thisEntryID) {
+		thisMenu->selectedEntry = (thisMenu->selectedEntry > 0u) ? thisMenu->selectedEntry-1u : MENU_MAX_ENTRIES;
 	}
 
 	for (unsigned int i=thisEntryID; i<thisMenu->numEntries-1u; i++) {
@@ -190,13 +216,11 @@ int mn_deleteEntry(Menu_t* thisMenu, const char* title) {
 	}
 
 	//Overwrite the last menu entry; will either be duplicate or already empty.
-	MenuEntry_t* last = thisMenu->entries + MENU_MAX_ENTRIES - 1u;
+	MenuEntry_t* last = thisMenu->entries + --thisMenu->numEntries;
 	last->isValid = FALSE;
-	last->title[0] = '\0';
+	if (last->title) {last->title[0] = '\0';}
 	free(last->data);
 	last->type = TYPE_NONE;
-
-	thisMenu->numEntries--;
 
 	return TRUE; //Success
 }
@@ -256,6 +280,7 @@ int mn_draw(const Menu_t* thisMenu, const Vec2i_t resolutionChars) {
 	//Draw each entry
 	for (unsigned int i=0u; i<thisMenu->numEntries; i++) {
 		const MenuEntry_t* thisEntry = thisMenu->entries + i;
+		if (!thisEntry->isValid) {continue;}
 		GET_CURSOR_ANSI_ESCAPE(startColumn, currentRow++, resetCursor);
 		printf("%s", resetCursor);
 		char* highlight = (thisMenu->selectedEntry == i) ? "\033[7m" : "";
@@ -265,6 +290,10 @@ int mn_draw(const Menu_t* thisMenu, const Vec2i_t resolutionChars) {
 			printf("%s┣%s", resetCursor, highlight);
 			printCentered(thisEntry->title, thisMenu->width-2u, "━", strlen(thisEntry->title) > 0u);
 			printf("%s┫", resetColour);
+		} else if (thisEntry->type == TYPE_CALLBACK) {
+			printf("%s┃%s", resetCursor, highlight);
+			printCentered(thisEntry->title, thisMenu->width-2u, " ", FALSE);
+			printf("%s┃", resetColour);
 		} else {
 			unsigned int titleWidth = thisMenu->width - 3u - MENU_VALUE_DISPLAY_LENGTH;
 			char valueBuffer[MENU_VALUE_DISPLAY_LENGTH + 1u]; valueBuffer[MENU_VALUE_DISPLAY_LENGTH] = '\0';
@@ -305,7 +334,7 @@ int mn_getEntry(const Menu_t* thisMenu, const char* entryName, MenuEntry_t** thi
 	unsigned int thisEntryID;
 	if (!mn_getEntryIndex(thisMenu, entryName, &thisEntryID)) {return FALSE;}
 
-	*thisEntry = thisMenu->entries + thisEntryID;
+	*thisEntry = (MenuEntry_t*)(thisMenu->entries + thisEntryID);
 	return TRUE; //Success
 }
 
@@ -322,9 +351,29 @@ int mn_editEntry(Menu_t* thisMenu) {
 	if (!isEditingEntry) {
 		if (lastPressedChar == '\n') {
 			//Start editing a value
-			isEditingEntry = TRUE;
-			entryBufferPtr = entryBuffer;
-			*entryBufferPtr = '\0';
+
+			switch (selectedEntry->type) {
+				case TYPE_BOOL: {
+					*(int*)(thisMenu->entries[thisMenu->selectedEntry].data) = (*(int*)(thisMenu->entries[thisMenu->selectedEntry].data)) == FALSE; //Very long line... Invert state.
+					finishedEditingEntry = TRUE;
+					isEditingEntry = FALSE;
+					lastPressedChar = '\0';
+					break;
+				}
+				case TYPE_CALLBACK: {
+					if (!thisMenu->entries[thisMenu->selectedEntry].callback()) {/* Something failed, Handle? */}
+					finishedEditingEntry = TRUE;
+					lastPressedChar = '\0';
+					isEditingEntry = FALSE;
+					break;
+				}
+				default: {
+					isEditingEntry = TRUE;
+					entryBufferPtr = entryBuffer;
+					*entryBufferPtr = '\0';
+					break;
+				}
+			}
 		}
 	} else {
 		//Already editing. Check for input and such.

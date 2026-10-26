@@ -12,14 +12,17 @@ void io_handleViewportMovement(double dt);
 
 
 //////// GEOMETRY EDITING ////////
+#define EDITOR_MAX_VERTICES 1024
+#define EDITOR_MAX_LINEDEFS 512
+#define EDITOR_MAX_SECTORS 128
 typedef enum {
 	EDIT_NONE, EDIT_VERTICES, EDIT_LINEDEFS, EDIT_SECTORS,
 	NUM_EDIT_MODES
 } EditMode_e;
 extern EditMode_e currentEditMode;
 
-void ed_init(const char* filePath);
-void ed_update(const Vec2i_t resolutionChars, char** filePath);
+void ed_init(char** filePath);
+int ed_update(const Vec2i_t resolutionChars);
 //////// GEOMETRY EDITING ////////
 
 

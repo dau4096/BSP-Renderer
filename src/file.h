@@ -10,6 +10,10 @@
 //////// XML FILE READING ////////
 extern const char* textureNames[MAX_TEXTURES];
 int f_loadGeo(const char* filePath);
+
+#ifdef EDITOR
+int f_saveGeo(const char* filePath);
+#endif
 //////// XML FILE READING ////////
 
 
