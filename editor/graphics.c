@@ -84,7 +84,7 @@ void r_drawLineBresenham(const Vec2i_t start, const Vec2i_t end, const RGB_t col
 	do {
 		t_writePX((Vec2i_t){.x=x, .y=y}, colour);
 
-		if (x == end.x && y == end.y) {break;}
+		if ((x == end.x) && (y == end.y)) {break;}
 
 		int e2 = 2 * error;
 		if (e2 > -dy) {
@@ -100,8 +100,8 @@ void r_drawLineBresenham(const Vec2i_t start, const Vec2i_t end, const RGB_t col
 }
 
 void r_drawLineAuto(const Vec2i_t start, const Vec2i_t end, const RGB_t colour) {
-	if (start.x == end.x) {r_drawLineVertical(start, end, colour);}
-	else if (start.y == end.y) {r_drawLineHorizontal(start, end, colour);}
+	if (start.y == end.y) {r_drawLineHorizontal(start, end, colour);}
+	else if (start.x == end.x) {r_drawLineVertical(start, end, colour);}
 	else {r_drawLineBresenham(start, end, colour);}
 }
 //////// LINES ////////

@@ -154,7 +154,7 @@ int ed_addNewSectorCBK(void) {
 	g_sectors[g_numSectors] = (Sector_t){
 		.floorHeight=0.0f, .floorTexture=0u, .floorColour=RGB_BLACK,
 		.ceilingHeight=0.0f, .ceilingTexture=0u, .ceilingColour=RGB_BLACK,
-		.flags=0b0000'0000, .lineDefs=NULL, .numLineDefs=0u,
+		.flags=0b00000000, .lineDefs=NULL, .numLineDefs=0u,
 		.lightLevel=0xFF, .isValid = TRUE
 	};
 
@@ -336,7 +336,7 @@ void ed_init(char** fpPtr) {
 int ed_update(const Vec2i_t resolutionChars) {
 	if (!isEditingEntry && keyMapPress[K_TURN_LEFT])  {
 		if (currentEditMode > 0) {currentEditMode--;}
-		else {currentEditMode = NUM_EDIT_MODES;}
+		else {currentEditMode = NUM_EDIT_MODES-1;}
 	}
 	if (!isEditingEntry && keyMapPress[K_TURN_RIGHT]) {currentEditMode = (currentEditMode+1) % NUM_EDIT_MODES;}
 
