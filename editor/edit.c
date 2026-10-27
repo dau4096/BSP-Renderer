@@ -361,15 +361,6 @@ int ed_update(const Vec2i_t resolutionChars) {
 				if (ENTRY_IS("Path")) {
 					//Change filepath to load/save.
 					strcpy(*filePathPtr, (char*)(changedEntry->data));
-				} else if (ENTRY_IS("Save")) {
-					//Save
-					*(int*)(changedEntry->data) = FALSE;
-				} else if (ENTRY_IS("Load")) {
-					//Load
-					*(int*)(changedEntry->data) = FALSE;
-				} else if (ENTRY_IS("Clear")) {
-					//Clear
-					*(int*)(changedEntry->data) = FALSE;
 				}
 				break;
 			}

@@ -389,7 +389,101 @@ int f_loadGeo(const char* filePath) {
 
 #ifdef EDITOR
 int f_saveGeo(const char* filePath) {
-	return TRUE; //TBA
+	FILE* fPTR = fopen(filePath, "w");
+	if (fPTR == NULL) {printf("Failed to write XML file."); return FALSE; /* fopen fail */}
+	
+
+	char* filePrefix = calloc(strlen(filePath) + 62u, sizeof(char));
+	sprintf(filePrefix, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!-- %s -->\n<geometry>\n\n", filePath);
+	fputs(filePrefix, fPTR); //XML prefix.
+	free(filePrefix);
+
+
+	//Camera entry
+	char buffer512[512u];
+	sprintf(
+		buffer512, "	<camera x=\"%.3f\" y=\"%.3f\" yaw=\"%.3f\" />\n",
+		r_camera->position.x, r_camera->position.y, r_camera->yaw
+	);
+	fputs(buffer512, fPTR);
+
+
+	//Vertices
+	fputs("	<vertices>\n", fPTR);
+	for (Vec2f_t* v=g_vertices; v<g_vertices+g_numVertices; v++) {
+		sprintf(
+			buffer512, "		<vertex x=\"%.3f\" y=\"%.3f\" />\n",
+			v->x, v->y
+		);
+		fputs(buffer512, fPTR);
+	}
+	fputs("	</vertices>\n", fPTR);
+
+
+	//LineDefs
+	fputs("	<lineDefs>\n", fPTR);
+	for (LineDef_t* ld=g_lineDefs; ld<g_lineDefs+g_numLineDefs; ld++) {
+		sprintf(
+			buffer512, "		<lineDef v0=\"%u\" v1=\"%u\" front=\"%d\" back=\"%d\" texture=\"%s\" />\n",
+			ld->vStart, ld->vEnd, ld->frontSector, ld->backSector, "textures/fallback.png"
+		);
+		fputs(buffer512, fPTR);
+	}
+	fputs("	</lineDefs>\n", fPTR);
+
+
+	//Sectors
+	fputs("	<sectors>\n", fPTR);
+	for (Sector_t* s=g_sectors; s<g_sectors+g_numSectors; s++) {
+		char fTexCol[128u];
+		if ((s->flags & 0x1u) > 0u) {
+			//Textured floor
+			sprintf(fTexCol, "floorTexture=\"%s\"", "textures/fallback.png");
+		} else {
+			//Untextured floor
+			sprintf(
+				fTexCol, "floorC=\"%02X%02X%02X\"",
+				s->floorColour.r, s->floorColour.g, s->floorColour.b
+			);
+		}
+
+		char cTexCol[128u];
+		if ((s->flags & 0x1u) > 0u) {
+			//Textured floor
+			sprintf(cTexCol, "ceilTexture=\"%s\"", "textures/fallback.png");
+		} else {
+			//Untextured floor
+			sprintf(
+				cTexCol, "ceilC=\"%02X%02X%02X\"",
+				s->ceilingColour.r, s->ceilingColour.g, s->ceilingColour.b
+			);
+		}
+
+
+		sprintf(
+			buffer512, "		<sector floorZ=\"%.3f\" %s ceilZ=\"%.3f\" %s lineDefs=\"",
+			s->floorHeight, fTexCol, s->ceilingHeight, cTexCol 
+		);
+		fputs(buffer512, fPTR);
+
+		char ldV[6]; //6 digits per index.
+		for (unsigned int* ldI=s->lineDefs; ldI<s->lineDefs+s->numLineDefs; ldI++) {
+			sprintf(ldV, "%4u", *ldI);
+			fputs(ldV, fPTR);
+			if (ldI > s->lineDefs) {fputs(" ", fPTR);}
+		}
+
+
+		sprintf(buffer512, "\" lightLevel=\"%u\" />\n", s->lightLevel);
+		fputs(buffer512, fPTR);
+	}
+	fputs("	</sectors>\n", fPTR);
+
+
+	fputs("</geometry>\n", fPTR); //XML suffix.
+	fclose(fPTR);
+
+	return TRUE; //Success
 }
 
 #else
@@ -410,8 +504,7 @@ int f_writeHTMLScreenshot(const char* filePath, const Vec2i_t resolution, const 
 
 
 	//Open file.
-	FILE* fPTR;
-	fPTR = fopen(filePath, "w");
+	FILE* fPTR = fopen(filePath, "w");
 	if (fPTR == NULL) {printf("Failed to write screenshot."); return FALSE; /* fopen fail */}
 
 	//Write contents of file
