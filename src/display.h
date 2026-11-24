@@ -21,6 +21,7 @@ extern int isUsingDirectDisplay;
 
 //////// DISPLAY ////////
 int d_init(void);	 		//Initialises the display manager.
+int d_isRunning(void); 		//Checks if display manager is running.
 int d_shutdown(void);	 	//Shuts down the display manager.
 
 int d_createWindow(const Vec2i_t resolution, const char* title); //Creates a window in this given display manager.
