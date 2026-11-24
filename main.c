@@ -16,6 +16,7 @@
 #include "src/ui.h"
 #include "src/multithread.h"
 #include "src/physics.h"
+#include "src/display.h"
 
 
 

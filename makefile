@@ -1,12 +1,12 @@
 CC = gcc
 INCLUDE = -I/usr/include -I/usr/local/include
-LIBS = -lm -ldl -ludev -pthread -lxml2
+LIBS = -lm -ldl -ludev -pthread -lxml2 -lwayland-client
 
 SHARED_FLAGS = -DCOLOUR_QUANTISATION -DLIMITED_FREQ -DPLANE_SPAN_TEXTURING
-DEBUG_FLAGS = -g -DDEBUG -DDEBUG_VALUES -DDEBUG_DRAW_ORDER #-DDEBUG_BORDERS #-DSUPPRESS_FRAMEBUFFER_OUTPUT
+DEBUG_FLAGS = -g -DDEBUG -DDEBUG_VALUES #-DDEBUG_DRAW_ORDER #-DDEBUG_BORDERS #-DSUPPRESS_FRAMEBUFFER_OUTPUT
 RELEASE_FLAGS =  -O3 -ffast-math -march=native
 
-SOURCES = main.c src/graphics.c src/terminal.c src/physics.c src/io.c src/ui.c src/file.c src/multithread.c
+SOURCES = ./main.c ./src/graphics.c ./src/terminal.c ./src/physics.c ./src/io.c ./src/ui.c ./src/file.c ./src/multithread.c ./.xdg/xdg-shell-protocol.c
 OBJECTS = $(SOURCES:.c=.o)
 BINFILE = prgm.x86_64
 
